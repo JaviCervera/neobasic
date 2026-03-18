@@ -56,6 +56,15 @@ Then run the output with Node:
 node myprogram.js
 ```
 
+> **Note:** Compiled `.js` files use CommonJS `require()`. If your output directory contains a `package.json` with `"type": "module"`, add a nested `package.json` with `{ "type": "commonjs" }` or rename the output to `.cjs`.
+
+### Run the Hello World example
+
+```bash
+node dist/cli.js compile examples/hello.nb
+node examples/hello.js
+```
+
 ### Global installation (optional)
 
 After building, you can link the CLI globally:
@@ -430,6 +439,29 @@ neo_mods/
 Import "ext"
 
 Foo("hello from NeoBasic!")
+```
+
+### Core module
+
+NeoBasic ships with a bundled `core` module that provides essential I/O and type-conversion functions. Import it with `Import "core"`.
+
+| Function | Signature | Description |
+|---|---|---|
+| `Print` | `(message As String)` | Print `message` followed by a newline |
+| `Input` | `() As String` | Read a line from stdin and return it |
+| `Str` | `(val As Int) As String` | Convert an `Int` to its string representation |
+| `StrF` | `(val As Float) As String` | Convert a `Float` to its string representation |
+| `Val` | `(s As String) As Int` | Parse a string as an `Int` (returns `0` on failure) |
+| `ValF` | `(s As String) As Float` | Parse a string as a `Float` (returns `0.0` on failure) |
+
+Example:
+
+```basic
+Import "core"
+
+Print("Enter a number:")
+n = Val(Input())
+Print("Double: " + Str(n * 2))
 ```
 
 ## License

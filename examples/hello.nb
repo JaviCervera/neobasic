@@ -1,0 +1,29 @@
+Import "core"
+
+Function Factorial(n As Int) As Int
+  If n <= 1 Then Return 1
+  Return n * Factorial(n - 1)
+EndFunction
+
+Print("=== NeoBasic Hello World ===")
+
+' Basic output
+Print("Hello, World!")
+
+' Integer operations with Str()
+result = Factorial(10)
+Print("10! = " + Str(result))
+
+' Float with StrF()
+pi As Float = 3.14159
+Print("Pi: " + StrF(pi))
+
+' String to number with Val()
+numStr = "21"
+num = Val(numStr) * 2
+Print(numStr + " * 2 = " + Str(num))
+
+' Interactive input (uncomment to use)
+' Print("What is your name?")
+' name = Input()
+' Print("Hello, " + name + "!")

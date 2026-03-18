@@ -1,0 +1,6 @@
+Function Print(message As String) = "print"
+Function Input() As String = "input"
+Function Str(val As Int) As String = "str"
+Function StrF(val As Float) As String = "strf"
+Function Val(s As String) As Int = "val"
+Function ValF(s As String) As Float = "valf"

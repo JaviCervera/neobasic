@@ -11,7 +11,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Integer division | `Int / Int` truncates to `Int` |
 | `=` vs `==` | `=` is always assignment; `==` is always equality |
 | Variable scoping | Function-scoped |
-| Standard library | None — everything comes from external `.nbm` modules |
+| Standard library | A bundled `core` module provides `Print`, `Input`, `Str`, `StrF`, `Val`, `ValF` |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
 
@@ -160,8 +160,28 @@ vitest.config.ts
 - End-to-end test suite: compile `.nb` fixture files, run the resulting JS with Node, assert stdout
 - Cover at least: variables, functions, recursion, UDTs, arrays, all loop types, modules
 
+## Bundled modules
+
+### `core`
+
+Located at `neo_mods/core/`. Provides essential I/O and conversion functions:
+
+| Function | Signature | Description |
+|---|---|---|
+| `Print` | `(message As String)` | Print a line to stdout |
+| `Input` | `() As String` | Read a line from stdin |
+| `Str` | `(val As Int) As String` | Convert Int to String |
+| `StrF` | `(val As Float) As String` | Convert Float to String |
+| `Val` | `(s As String) As Int` | Parse String to Int |
+| `ValF` | `(s As String) As Float` | Parse String to Float |
+
+Usage: `Import "core"` at the top of a `.nb` file.
+
+## Examples
+
+`examples/hello.nb` — demonstrates `Print`, `Str`, `StrF`, and `Val` via a factorial calculation and basic arithmetic.
+
 ## Out of scope (for now)
 - Source maps
 - REPL
 - Watch mode
-- Standard library (use `.nbm` modules instead)
