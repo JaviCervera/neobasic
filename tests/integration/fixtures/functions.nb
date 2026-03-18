@@ -1,0 +1,10 @@
+Function Double(x As Int) As Int
+  Return x * 2
+EndFunction
+
+Function Add(a As Int, b As Int) As Int
+  Return a + b
+EndFunction
+
+result = Double(5)
+result2 = Add(3, 4)

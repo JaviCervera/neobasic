@@ -1,0 +1,4 @@
+a = 25
+b As Float = 162.36
+c As String = "hello"
+Const PI = 3

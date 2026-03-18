@@ -1,0 +1,38 @@
+'Test all loop types
+
+'While loop
+a = 0
+While a < 5
+  a = a + 1
+EndWhile
+
+'For loop
+sum = 0
+For i = 1 To 10
+  sum = sum + i
+Next
+
+'For with step
+sum2 = 0
+For i = 10 To 1 Step -1
+  sum2 = sum2 + i
+Next
+
+'For..In loop
+total = 0
+For x In [1, 2, 3, 4, 5]
+  total = total + x
+Next
+
+'Do..Loop with Exit
+count = 0
+Do
+  count = count + 1
+  If count == 3 Then Exit
+Loop
+
+'Repeat..Until
+r = 0
+Repeat
+  r = r + 1
+Until r == 5

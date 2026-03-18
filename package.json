@@ -1,0 +1,37 @@
+{
+  "name": "neobasic",
+  "version": "0.1.0",
+  "description": "A BASIC-like language that transpiles to JavaScript. Inspired by BlitzBasic.",
+  "type": "module",
+  "main": "dist/compiler.js",
+  "bin": {
+    "neobasic": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JaviCervera/neobasic.git"
+  },
+  "keywords": [
+    "basic",
+    "transpiler",
+    "compiler",
+    "language"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JaviCervera/neobasic/issues"
+  },
+  "homepage": "https://github.com/JaviCervera/neobasic#readme",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  }
+}

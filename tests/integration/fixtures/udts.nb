@@ -1,0 +1,10 @@
+Type Person
+  Name As String
+  Age As Int
+EndType
+
+p As Person = New Person
+p.Name = "John"
+p.Age = 30
+name = p.Name
+age = p.Age

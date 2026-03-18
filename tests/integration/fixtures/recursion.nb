@@ -1,0 +1,6 @@
+Function Factorial(n As Int) As Int
+  If n <= 1 Then Return 1
+  Return n * Factorial(n - 1)
+EndFunction
+
+result = Factorial(5)

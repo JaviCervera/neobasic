@@ -1,0 +1,371 @@
+import {
+  Program, Stmt, Expr, TypeAnnotation,
+} from "../parser/ast.js";
+import { CheckResult, CheckerEnv } from "../checker/checker.js";
+import { NbType } from "../checker/types.js";
+
+export interface CodegenOptions {
+  /** Module imports: module name → relative path to .js file */
+  moduleImports?: Map<string, string>;
+}
+
+export function generate(program: Program, checkResult: CheckResult, options?: CodegenOptions): string {
+  const lines: string[] = [];
+  let indent = 0;
+  const env = checkResult.env;
+  const exprTypes = checkResult.exprTypes;
+
+  function emit(line: string): void {
+    lines.push("  ".repeat(indent) + line);
+  }
+
+  function emitRaw(line: string): void {
+    lines.push(line);
+  }
+
+  function id(name: string): string {
+    return name.toLowerCase();
+  }
+
+  // ── Module imports ──────────────────────────────────────────
+
+  if (options?.moduleImports) {
+    for (const [moduleName, jsPath] of options.moduleImports) {
+      emit(`const ${id(moduleName)} = require(${JSON.stringify(jsPath)});`);
+    }
+    if (options.moduleImports.size > 0) {
+      emitRaw("");
+    }
+  }
+
+  // ── Type factories ────────────────────────────────────────
+
+  for (const stmt of program.statements) {
+    if (stmt.kind === "TypeDecl") {
+      emitTypeFactory(stmt);
+      emitRaw("");
+    }
+  }
+
+  // ── Statements ────────────────────────────────────────────
+
+  for (const stmt of program.statements) {
+    if (stmt.kind === "TypeDecl") continue; // Already emitted
+    emitStmt(stmt);
+  }
+
+  function emitTypeFactory(stmt: Stmt & { kind: "TypeDecl" }): void {
+    const name = id(stmt.name);
+    emit(`function ${name}$$new() {`);
+    indent++;
+    emit("return {");
+    indent++;
+    for (const field of stmt.fields) {
+      const typeDecl = env.types.get(name);
+      const fieldDef = typeDecl?.fields.find(f => f.name.toLowerCase() === field.name.toLowerCase());
+      const defaultVal = fieldDef ? defaultValueFor(fieldDef.type) : "null";
+      emit(`${id(field.name)}: ${defaultVal},`);
+    }
+    indent--;
+    emit("};");
+    indent--;
+    emit("}");
+  }
+
+  function defaultValueFor(t: NbType): string {
+    switch (t.kind) {
+      case "Int": return "0";
+      case "Float": return "0.0";
+      case "String": return '""';
+      case "Bool": return "false";
+      case "Array": return "[]";
+      case "UDT": return "null";
+      case "Null": return "null";
+      case "Void": return "undefined";
+    }
+  }
+
+  function emitStmt(stmt: Stmt): void {
+    switch (stmt.kind) {
+      case "VarDecl": {
+        const init = stmt.initializer ? emitExpr(stmt.initializer) : defaultValueForAnnotation(stmt.typeAnnotation);
+        emit(`let ${id(stmt.name)} = ${init};`);
+        break;
+      }
+
+      case "VarAssign": {
+        emit(`${id(stmt.name)} = ${emitExpr(stmt.value)};`);
+        break;
+      }
+
+      case "IndexAssign": {
+        emit(`${emitExpr(stmt.object)}[${emitExpr(stmt.index)}] = ${emitExpr(stmt.value)};`);
+        break;
+      }
+
+      case "MemberAssign": {
+        const obj = emitExpr(stmt.object);
+        const member = stmt.member.toLowerCase();
+        // Special: array.Length setter
+        if (member === "length") {
+          const objType = exprTypes.get(stmt.object);
+          if (objType?.kind === "Array") {
+            emit(`${obj}.length = (${emitExpr(stmt.value)}) + 1;`);
+            break;
+          }
+        }
+        emit(`${obj}.${member} = ${emitExpr(stmt.value)};`);
+        break;
+      }
+
+      case "ConstDecl": {
+        emit(`const ${id(stmt.name)} = ${emitExpr(stmt.value)};`);
+        break;
+      }
+
+      case "IfStmt": {
+        emit(`if (${emitExpr(stmt.condition)}) {`);
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        for (const eif of stmt.elseIfs) {
+          emit(`} else if (${emitExpr(eif.condition)}) {`);
+          indent++;
+          for (const s of eif.body) emitStmt(s);
+          indent--;
+        }
+        if (stmt.elseBody.length > 0) {
+          emit("} else {");
+          indent++;
+          for (const s of stmt.elseBody) emitStmt(s);
+          indent--;
+        }
+        emit("}");
+        break;
+      }
+
+      case "SelectStmt": {
+        // Emit as if/else chain since Select doesn't fall through
+        const exprCode = emitExpr(stmt.expr);
+        const tempVar = `__sel_${stmt.line}_${stmt.col}`;
+        emit(`const ${tempVar} = ${exprCode};`);
+        let first = true;
+        for (const c of stmt.cases) {
+          const conditions = c.values.map(v => `${tempVar} === ${emitExpr(v)}`).join(" || ");
+          emit(`${first ? "if" : "} else if"} (${conditions}) {`);
+          indent++;
+          for (const s of c.body) emitStmt(s);
+          indent--;
+          first = false;
+        }
+        if (stmt.defaultBody.length > 0) {
+          emit("} else {");
+          indent++;
+          for (const s of stmt.defaultBody) emitStmt(s);
+          indent--;
+        }
+        if (stmt.cases.length > 0 || stmt.defaultBody.length > 0) {
+          emit("}");
+        }
+        break;
+      }
+
+      case "ForStmt": {
+        const varName = id(stmt.variable);
+        const start = emitExpr(stmt.start);
+        const end = emitExpr(stmt.end);
+        if (stmt.step) {
+          const step = emitExpr(stmt.step);
+          emit(`for (let ${varName} = ${start}; ${step} > 0 ? ${varName} <= ${end} : ${varName} >= ${end}; ${varName} += ${step}) {`);
+        } else {
+          emit(`for (let ${varName} = ${start}; ${varName} <= ${end}; ${varName}++) {`);
+        }
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit("}");
+        break;
+      }
+
+      case "ForInStmt": {
+        emit(`for (const ${id(stmt.variable)} of ${emitExpr(stmt.iterable)}) {`);
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit("}");
+        break;
+      }
+
+      case "WhileStmt": {
+        emit(`while (${emitExpr(stmt.condition)}) {`);
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit("}");
+        break;
+      }
+
+      case "DoLoopStmt": {
+        emit("while (true) {");
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit("}");
+        break;
+      }
+
+      case "RepeatUntilStmt": {
+        emit("do {");
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit(`} while (!(${emitExpr(stmt.condition)}));`);
+        break;
+      }
+
+      case "FunctionDecl": {
+        const params = stmt.params.map(p => id(p.name)).join(", ");
+        emit(`function ${id(stmt.name)}(${params}) {`);
+        indent++;
+        for (const s of stmt.body) emitStmt(s);
+        indent--;
+        emit("}");
+        emitRaw("");
+        break;
+      }
+
+      case "TypeDecl": {
+        // Already handled at the top
+        break;
+      }
+
+      case "ReturnStmt": {
+        if (stmt.value) {
+          emit(`return ${emitExpr(stmt.value)};`);
+        } else {
+          emit("return;");
+        }
+        break;
+      }
+
+      case "ContinueStmt": {
+        emit("continue;");
+        break;
+      }
+
+      case "ExitStmt": {
+        emit("break;");
+        break;
+      }
+
+      case "ExprStmt": {
+        emit(`${emitExpr(stmt.expr)};`);
+        break;
+      }
+
+      case "IncludeStmt":
+      case "ImportStmt":
+        // Handled by the compiler orchestrator
+        break;
+    }
+  }
+
+  function emitExpr(expr: Expr): string {
+    switch (expr.kind) {
+      case "IntLiteral":
+        return String(expr.value);
+      case "FloatLiteral":
+        return String(expr.value);
+      case "StringLiteral":
+        return JSON.stringify(expr.value);
+      case "BoolLiteral":
+        return expr.value ? "true" : "false";
+      case "NullLiteral":
+        return "null";
+
+      case "Identifier":
+        return id(expr.name);
+
+      case "BinaryExpr": {
+        const left = emitExpr(expr.left);
+        const right = emitExpr(expr.right);
+
+        // Int / Int → Math.trunc
+        if (expr.op === "/") {
+          const lt = exprTypes.get(expr.left);
+          const rt = exprTypes.get(expr.right);
+          if (lt?.kind === "Int" && rt?.kind === "Int") {
+            return `Math.trunc(${left} / ${right})`;
+          }
+        }
+
+        const opMap: Record<string, string> = {
+          "+": "+", "-": "-", "*": "*", "/": "/",
+          "Mod": "%",
+          "==": "===", "<>": "!==",
+          "<": "<", ">": ">", "<=": "<=", ">=": ">=",
+          "And": "&&", "Or": "||",
+        };
+
+        return `(${left} ${opMap[expr.op]} ${right})`;
+      }
+
+      case "UnaryExpr": {
+        const operand = emitExpr(expr.operand);
+        if (expr.op === "Not") return `(!${operand})`;
+        return `(-${operand})`;
+      }
+
+      case "CallExpr": {
+        const callee = id(expr.callee);
+        const func = env.funcs.get(callee);
+        // If it's an external module function, use the module prefix
+        if (func?.isExternal && func.externalName) {
+          // Find which module this function belongs to
+          const args = expr.args.map(a => emitExpr(a)).join(", ");
+          return `${func.externalName}(${args})`;
+        }
+        const args = expr.args.map(a => emitExpr(a)).join(", ");
+        return `${callee}(${args})`;
+      }
+
+      case "IndexExpr":
+        return `${emitExpr(expr.object)}[${emitExpr(expr.index)}]`;
+
+      case "MemberExpr": {
+        const obj = emitExpr(expr.object);
+        const member = expr.member.toLowerCase();
+        // Special: array.Length → (arr.length - 1)
+        if (member === "length") {
+          const objType = exprTypes.get(expr.object);
+          if (objType?.kind === "Array") {
+            return `(${obj}.length - 1)`;
+          }
+        }
+        return `${obj}.${member}`;
+      }
+
+      case "NewExpr":
+        return `${id(expr.typeName)}$$new()`;
+
+      case "ArrayLiteral": {
+        const elems = expr.elements.map(e => emitExpr(e)).join(", ");
+        return `[${elems}]`;
+      }
+    }
+  }
+
+  function defaultValueForAnnotation(ta: TypeAnnotation | null): string {
+    if (!ta) return "null";
+    if (ta.kind === "ArrayType") return "[]";
+    switch (ta.name.toLowerCase()) {
+      case "int": return "0";
+      case "float": return "0.0";
+      case "string": return '""';
+      case "bool": return "false";
+      default: return "null"; // UDT
+    }
+  }
+
+  return lines.join("\n") + "\n";
+}

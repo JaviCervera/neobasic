@@ -1,0 +1,4 @@
+arr As Int[] = [10, 20, 30]
+first = arr[0]
+arr[1] = 99
+len = arr.Length
