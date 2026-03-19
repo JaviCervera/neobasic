@@ -4,7 +4,7 @@ import * as os from "node:os";
 import { lex } from "../lexer/index.js";
 import { Token, TokenKind } from "../lexer/tokens.js";
 import { ModuleError } from "../errors.js";
-import { FuncSymbol, TypeDeclSymbol } from "../checker/checker.js";
+import { FuncSymbol } from "../checker/checker.js";
 import { NbType, INT, FLOAT, STRING, BOOL, VOID, arrayOf, udtOf } from "../checker/types.js";
 
 export interface ModuleDefinition {

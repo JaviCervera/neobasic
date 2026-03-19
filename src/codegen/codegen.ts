@@ -1,7 +1,7 @@
 import {
   Program, Stmt, Expr, TypeAnnotation,
 } from "../parser/ast.js";
-import { CheckResult, CheckerEnv } from "../checker/checker.js";
+import { CheckResult } from "../checker/checker.js";
 import { NbType } from "../checker/types.js";
 
 export interface CodegenOptions {

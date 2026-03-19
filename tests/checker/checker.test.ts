@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { lex } from "../../src/lexer/index.js";
 import { parse } from "../../src/parser/index.js";
-import { check, INT, FLOAT, STRING, BOOL, type CheckerEnv, type FuncSymbol } from "../../src/checker/index.js";
+import { check, STRING, type CheckerEnv, type FuncSymbol } from "../../src/checker/index.js";
 
 function c(source: string, env?: Partial<CheckerEnv>) {
   return check(parse(lex(source)), "<test>", env);

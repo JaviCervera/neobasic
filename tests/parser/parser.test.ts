@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { lex } from "../../src/lexer/index.js";
 import { parse } from "../../src/parser/index.js";
-import type { Program, Stmt, Expr } from "../../src/parser/ast.js";
+import type { Program, Stmt } from "../../src/parser/ast.js";
 
 function p(source: string): Program {
   return parse(lex(source));

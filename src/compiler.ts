@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { lex } from "./lexer/index.js";
 import { parse, Program, Stmt } from "./parser/index.js";
-import { check, CheckResult, CheckerEnv, FuncSymbol, VarSymbol } from "./checker/index.js";
+import { check, CheckerEnv, FuncSymbol, VarSymbol } from "./checker/index.js";
 import { generate } from "./codegen/index.js";
 import { resolveModule } from "./modules/index.js";
 import { NeoBasicError } from "./errors.js";

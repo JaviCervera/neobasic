@@ -47,15 +47,6 @@ export function parse(tokens: Token[], file = "<stdin>"): Program {
     }
   }
 
-  function expectTerminator(): void {
-    if (!atAny(TokenKind.Newline, TokenKind.Colon, TokenKind.EOF)) {
-      error(`Expected end of statement but got '${current().value}'`);
-    }
-    if (atAny(TokenKind.Newline, TokenKind.Colon)) {
-      advance();
-    }
-  }
-
   // ── Type Annotations ─────────────────────────────────────
 
   function parseTypeAnnotation(): TypeAnnotation {

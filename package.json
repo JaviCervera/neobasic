@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "lint": "eslint src tests",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -29,9 +30,12 @@
   },
   "homepage": "https://github.com/JaviCervera/neobasic#readme",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.0",
+    "eslint": "^10.0.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
     "vitest": "^1.6.1"
   }
 }

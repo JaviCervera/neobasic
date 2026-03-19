@@ -5,10 +5,6 @@ function kinds(source: string): TokenKind[] {
   return lex(source).map((t) => t.kind);
 }
 
-function values(source: string): string[] {
-  return lex(source).map((t) => t.value);
-}
-
 describe("Lexer", () => {
   describe("literals", () => {
     it("lexes integer literals", () => {

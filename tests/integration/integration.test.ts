@@ -3,7 +3,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import { lex } from "../../src/lexer/index.js";
 import { parse } from "../../src/parser/index.js";
-import { check, type CheckerEnv } from "../../src/checker/index.js";
+import { check } from "../../src/checker/index.js";
 import { generate } from "../../src/codegen/index.js";
 import { compile } from "../../src/compiler.js";
 

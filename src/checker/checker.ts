@@ -1,7 +1,6 @@
 import { TypeError } from "../errors.js";
 import {
   Program, Stmt, Expr, TypeAnnotation,
-  FunctionDecl, TypeDecl, FunctionParam, TypeField,
 } from "../parser/ast.js";
 import {
   NbType, INT, FLOAT, STRING, BOOL, NULL, VOID,
@@ -144,7 +143,7 @@ export function check(
           return INT;
         }
 
-        err(`Unknown operator '${expr.op}'`, expr.line, expr.col);
+        return err(`Unknown operator '${expr.op}'`, expr.line, expr.col);
       }
 
       case "UnaryExpr": {
@@ -159,7 +158,7 @@ export function check(
           }
           return BOOL;
         }
-        err(`Unknown unary operator '${expr.op}'`, expr.line, expr.col);
+        return err(`Unknown unary operator '${expr.op}'`, expr.line, expr.col);
       }
 
       case "CallExpr": {
