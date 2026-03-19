@@ -185,6 +185,227 @@ const core = (() => {
 - Module `.js` files must use `module.exports = { ... }` (existing convention).
 - Inlined modules that themselves `require()` Node built-ins (e.g. `fs`) remain valid for Node targets. Third-party npm `require()` calls inside a module are left as-is and must be satisfied at runtime.
 
+### Phase 9 — Raylib Module
+
+**Goal:** Add a `raylib` module that provides full access to the Raylib game development library via WebAssembly, enabling NeoBasic programs to create graphical applications.
+
+#### 9.0 — Design Decisions
+
+| Topic | Decision |
+|---|---|
+| WASM distribution | Base64-encoded WASM binary embedded in `raylib.js` |
+| Async initialisation | Top-level `await`; compiled output wrapped in async IIFE when raylib is imported |
+| Struct mapping | Raylib C structs mapped to NeoBasic UDTs via new `.nbm` `Type` declarations |
+| Value vs handle types | Value types (Color, Vector2, …) fully marshaled; handle types (Texture, Font, …) tracked by internal `__ptr` |
+| Color constants | Declared as zero-arg functions returning Color (e.g. `Function RED() As Color`) |
+| Integer constants | `.nbm` `Const` declarations (keys, buttons, flags, etc.) |
+| WASM build | Emscripten compilation of raylib C source; glue JS + base64 WASM bundled in module |
+
+#### 9.1 — Infrastructure: `.nbm` Type Declarations
+
+Extend the module definition format to support `Type…EndType` blocks:
+
+```
+Type Color
+  R As Int
+  G As Int
+  B As Int
+  A As Int
+EndType
+```
+
+**Changes:**
+- **`module-loader.ts`** — add `Type` keyword parsing to `parseModuleFile()`. Parse fields (name + type annotation) until `EndType`. Store in a new `types` field on `ModuleDefinition`.
+- **`compiler.ts`** — register module types into `CheckerEnv.types`. Inject synthetic `TypeDecl` AST nodes so the codegen emits `type$$new()` factory functions.
+- **`codegen.ts`** — no changes needed; existing TypeDecl handling emits factories for module types identically to user types.
+- **`checker.ts`** — no changes needed; module types are registered the same way as user types.
+
+#### 9.2 — Infrastructure: Async Module Support
+
+When a module requires async initialisation (WASM loading), the compiled output must use `await`.
+
+**Approach:**
+- Add an `@async` directive recognised at the top of `.nbm` files (before any Function/Type/Const).
+- In `compiler.ts`, track whether any imported module is async.
+- In `codegen.ts`:
+  - If any module is async, wrap the entire output in `(async () => { … })();`
+  - Emit async module IIFEs: `const raylib = await (async () => { … })();`
+  - Non-async modules (like `core`) remain synchronous IIFEs inside the async wrapper.
+
+**Example compiled output:**
+```js
+(async () => {
+  const core = (() => {
+    const module = { exports: {} };
+    // … core.js …
+    return module.exports;
+  })();
+
+  const raylib = await (async () => {
+    const module = { exports: {} };
+    // … raylib.js (async WASM init) …
+    return module.exports;
+  })();
+
+  // … user code …
+})();
+```
+
+#### 9.3 — WASM Build Pipeline
+
+Create `neo_mods/raylib/build/` containing:
+
+1. **`build.sh`** — compiles raylib with emscripten, base64-encodes the `.wasm`, and assembles the final `raylib.js` by combining:
+   - Base64 WASM string constant
+   - WASM instantiation code (decode → compile → instantiate)
+   - Memory management helpers (malloc/free wrappers, stack allocator)
+   - Struct layout definitions and marshaling functions
+   - Function wrappers for every exported raylib function
+2. **`struct-layouts.json`** — auto-generated C struct field offsets and sizes (used by marshaling code).
+3. A copy of the raylib source or a script to download a pinned release.
+
+**Prerequisites:** Emscripten SDK. Only needed when rebuilding; the committed `raylib.js` includes the embedded WASM so end users don't need emscripten.
+
+#### 9.4 — Struct Marshaling
+
+Two categories of types live in `raylib.js`:
+
+**Value types** — Color, Vector2, Vector3, Vector4, Rectangle, Camera2D, Camera3D, Ray, BoundingBox, Matrix, NPatchInfo, Transform, RayCollision
+- Fully user-constructable via `New`.
+- All fields readable and writable by user code.
+- Marshaled to WASM memory when passed to a function; marshaled back when returned.
+- No hidden state.
+
+**Handle types** — Image, Texture, RenderTexture, Font, GlyphInfo, Sound, Music, Wave, AudioStream, Shader, Mesh, Material, Model, ModelAnimation, BoneInfo
+- Created only by loading/generating functions (not `New`).
+- Expose user-readable fields (width, height, etc.).
+- Track internal WASM pointer via a hidden `__ptr` property.
+- Must be explicitly unloaded to free WASM memory.
+
+**Marshaling helpers:**
+```js
+// Layout definitions
+const LAYOUTS = {
+  Color:   { size: 4,  fields: { r: [0,'u8'], g: [1,'u8'], b: [2,'u8'], a: [3,'u8'] } },
+  Vector2: { size: 8,  fields: { x: [0,'f32'], y: [4,'f32'] } },
+  // …
+};
+
+function writeStruct(ptr, layout, obj) { /* write fields to WASM heap */ }
+function readStruct(ptr, layout)       { /* read fields from WASM heap → JS object */ }
+function allocStruct(layout)           { /* malloc(layout.size) */ }
+function freeStruct(ptr)               { /* free(ptr) */ }
+function allocString(str)              { /* UTF-8 encode → WASM heap */ }
+function readString(ptr)               { /* null-terminated C string → JS string */ }
+```
+
+#### 9.5 — Module Declaration (`raylib.nbm`)
+
+The `.nbm` file declares every type, function, and constant.
+
+**Types (~30):**
+
+| Category | Types |
+|---|---|
+| Math | Vector2, Vector3, Vector4, Matrix |
+| Color / Shape | Color, Rectangle |
+| Camera | Camera2D, Camera3D |
+| Texture | Image, Texture, RenderTexture, NPatchInfo |
+| Text | Font, GlyphInfo |
+| Audio | Wave, Sound, Music, AudioStream |
+| 3D | Ray, RayCollision, BoundingBox, Mesh, Material, Model, ModelAnimation, Transform, Shader, BoneInfo |
+
+**Functions (~450) by category:**
+
+| Category | ~Count | Key examples |
+|---|---|---|
+| Window management | 45 | InitWindow, CloseWindow, WindowShouldClose, SetWindowTitle, GetScreenWidth |
+| Cursor | 6 | ShowCursor, HideCursor, IsCursorHidden, EnableCursor, DisableCursor |
+| Drawing control | 15 | ClearBackground, BeginDrawing, EndDrawing, BeginMode2D, EndMode2D, BeginMode3D |
+| Timing | 4 | SetTargetFPS, GetFPS, GetFrameTime, GetTime |
+| Configuration | 6 | SetConfigFlags, SetTraceLogLevel, TakeScreenshot, OpenURL |
+| Input: Keyboard | 7 | IsKeyPressed, IsKeyDown, IsKeyReleased, IsKeyUp, GetKeyPressed, GetCharPressed |
+| Input: Mouse | 14 | IsMouseButtonPressed, GetMousePosition, GetMouseDelta, SetMousePosition, GetMouseWheelMove |
+| Input: Gamepad | 9 | IsGamepadAvailable, IsGamepadButtonPressed, GetGamepadAxisMovement |
+| Input: Touch | 5 | GetTouchX, GetTouchY, GetTouchPosition, GetTouchPointCount |
+| Shapes | 45 | DrawPixel, DrawLine, DrawCircle, DrawRectangle, DrawTriangle, DrawPoly, DrawRing |
+| Collision (2D) | 10 | CheckCollisionRecs, CheckCollisionCircles, CheckCollisionCircleRec, GetCollisionRec |
+| Image / Texture loading | 25 | LoadImage, LoadTexture, UnloadTexture, GenImageColor, ExportImage |
+| Image manipulation | 40 | ImageCopy, ImageResize, ImageFlipVertical, ImageDraw, ImageDrawText |
+| Texture drawing | 6 | DrawTexture, DrawTextureRec, DrawTexturePro, DrawTextureNPatch |
+| Texture config | 3 | GenTextureMipmaps, SetTextureFilter, SetTextureWrap |
+| Font loading | 8 | GetFontDefault, LoadFont, LoadFontEx, UnloadFont |
+| Text drawing | 6 | DrawFPS, DrawText, DrawTextEx, DrawTextPro |
+| Text metrics / helpers | 15 | MeasureText, MeasureTextEx, TextSubtext, TextToUpper, TextToLower |
+| 3D shapes | 20 | DrawCube, DrawSphere, DrawCylinder, DrawCapsule, DrawPlane, DrawGrid |
+| Model loading | 5 | LoadModel, IsModelReady, UnloadModel, GetModelBoundingBox |
+| Mesh generation | 15 | GenMeshPoly, GenMeshPlane, GenMeshCube, GenMeshSphere |
+| Materials | 5 | LoadMaterialDefault, SetMaterialTexture, SetModelMeshMaterial |
+| Model animation | 5 | LoadModelAnimations, UpdateModelAnimation, IsModelAnimationValid |
+| 3D collision | 8 | CheckCollisionSpheres, GetRayCollisionSphere, GetRayCollisionMesh |
+| Audio device | 5 | InitAudioDevice, CloseAudioDevice, IsAudioDeviceReady, SetMasterVolume |
+| Sound | 15 | LoadSound, PlaySound, StopSound, PauseSound, SetSoundVolume |
+| Music | 15 | LoadMusicStream, PlayMusicStream, UpdateMusicStream, SetMusicVolume, GetMusicTimeLength |
+| AudioStream | 12 | LoadAudioStream, PlayAudioStream, SetAudioStreamVolume |
+| Color constants (zero-arg fns) | 26 | RED(), GREEN(), BLUE(), WHITE(), BLACK(), RAYWHITE(), LIGHTGRAY() |
+
+**Constants (~230):**
+
+| Category | ~Count | Examples |
+|---|---|---|
+| Keyboard keys | 110 | KEY_A = 65, KEY_SPACE = 32, KEY_ENTER = 257, KEY_ESCAPE = 256 |
+| Mouse buttons | 7 | MOUSE_BUTTON_LEFT = 0, MOUSE_BUTTON_RIGHT = 1, MOUSE_BUTTON_MIDDLE = 2 |
+| Gamepad buttons | 18 | GAMEPAD_BUTTON_LEFT_FACE_UP = 1, GAMEPAD_BUTTON_RIGHT_TRIGGER_2 = 17 |
+| Gamepad axes | 6 | GAMEPAD_AXIS_LEFT_X = 0, GAMEPAD_AXIS_RIGHT_TRIGGER = 5 |
+| Config flags | 16 | FLAG_VSYNC_HINT = 64, FLAG_FULLSCREEN_MODE = 2, FLAG_WINDOW_RESIZABLE = 4 |
+| Texture filters | 6 | TEXTURE_FILTER_POINT = 0, TEXTURE_FILTER_BILINEAR = 1 |
+| Texture wrap modes | 4 | TEXTURE_WRAP_REPEAT = 0, TEXTURE_WRAP_CLAMP = 1 |
+| Blend modes | 8 | BLEND_ALPHA = 0, BLEND_ADDITIVE = 1, BLEND_MULTIPLIED = 2 |
+| Camera modes | 5 | CAMERA_CUSTOM = 0, CAMERA_FREE = 1, CAMERA_FIRST_PERSON = 3 |
+| Camera projections | 2 | CAMERA_PERSPECTIVE = 0, CAMERA_ORTHOGRAPHIC = 1 |
+| Gestures | 11 | GESTURE_NONE = 0, GESTURE_TAP = 1, GESTURE_SWIPE_RIGHT = 64 |
+| Mouse cursors | 10 | MOUSE_CURSOR_DEFAULT = 0, MOUSE_CURSOR_CROSSHAIR = 3 |
+| Pixel formats | 20 | PIXELFORMAT_UNCOMPRESSED_GRAYSCALE = 1 |
+| Log levels | 8 | LOG_ALL = 0, LOG_TRACE = 1, LOG_NONE = 7 |
+
+#### 9.6 — Testing Strategy
+
+- **Infrastructure unit tests:**
+  - `.nbm` Type parsing (module-loader test)
+  - Async IIFE codegen wrapping (codegen test)
+  - Module type registration in checker (checker test)
+- **Integration tests:**
+  - Compile a program that imports raylib and uses basic types/functions
+  - Verify compiled output structure (async IIFE wrapper, `await`, type factories)
+- **Raylib-specific tests (require WASM build):**
+  - Struct marshaling round-trip correctness
+  - Window creation / basic drawing (may need headless or mock)
+
+#### 9.7 — Example
+
+`examples/raylib-hello.nb`:
+```basic
+Import "raylib"
+
+InitWindow(800, 450, "NeoBasic — Raylib Example")
+SetTargetFPS(60)
+
+While Not WindowShouldClose()
+  BeginDrawing()
+  ClearBackground(RAYWHITE())
+  DrawText("Hello from NeoBasic!", 190, 200, 20, DARKGRAY())
+  EndDrawing()
+EndWhile
+
+CloseWindow()
+```
+
+#### 9.8 — Documentation
+
+- Update `README.md` with Raylib module reference
+- Document WASM build process for contributors
+- Add the example above to `examples/`
+
 ## Bundled modules
 
 ### `core`
@@ -201,9 +422,19 @@ Located at `neo_mods/core/`. Provides essential I/O and conversion functions:
 
 Usage: `Import "core"` at the top of a `.nb` file.
 
+### `raylib`
+
+Located at `neo_mods/raylib/`. Provides full access to the [Raylib](https://www.raylib.com/) game development library via WebAssembly.
+
+Usage: `Import "raylib"` at the top of a `.nb` file.
+
+See Phase 9 for full implementation details.
+
 ## Examples
 
 `examples/hello.nb` — demonstrates `Print`, `Str`, `StrF`, and `Val` via a factorial calculation and basic arithmetic.
+
+`examples/raylib-hello.nb` — demonstrates a basic Raylib window with text rendering.
 
 ## Out of scope (for now)
 - Source maps
