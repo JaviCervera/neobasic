@@ -1,0 +1,3 @@
+Import "testmod"
+
+result = Double(21)

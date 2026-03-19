@@ -11,7 +11,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Integer division | `Int / Int` truncates to `Int` |
 | `=` vs `==` | `=` is always assignment; `==` is always equality |
 | Variable scoping | Function-scoped |
-| Standard library | A bundled `core` module provides `Print`, `Input`, `Str`, `StrF`, `Val`, `ValF` |
+| Standard library | A bundled `core` module provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
 
@@ -142,7 +142,7 @@ vitest.config.ts
   - `For i = start To end Step s` → classic `for` loop
   - `Do...Loop` → `while (true)`
   - `Repeat...Until cond` → `do { ... } while (!(cond))`
-  - Imported module `.js` files are `require()`-d at the top of the output
+  - Imported module `.js` files are inlined into the output as IIFEs (see Phase 8)
 - Write Vitest tests for the code generator
 
 ### Phase 5 — Module Loader
@@ -160,6 +160,31 @@ vitest.config.ts
 - End-to-end test suite: compile `.nb` fixture files, run the resulting JS with Node, assert stdout
 - Cover at least: variables, functions, recursion, UDTs, arrays, all loop types, modules
 
+### Phase 8 — Module Bundling
+
+**Problem:** The code generator originally emitted `require()` calls with absolute file paths for module imports, making compiled output non-portable (it only works on the machine it was compiled on).
+
+**Solution:** Inline each module's JavaScript source into the generated output wrapped in a CommonJS-compatible IIFE. This produces a single self-contained `.js` file with no external dependencies beyond Node built-ins.
+
+**IIFE wrapping convention:**
+```js
+const core = (() => {
+  const module = { exports: {} };
+  // ... verbatim content of core.js ...
+  return module.exports;
+})();
+```
+
+**Changes:**
+- `CodegenOptions` gains `moduleContents?: Map<string, string>` (module name → JS source). Modules are inlined as IIFEs.
+- `CompileOptions` gains no new fields — bundling is always on. The compiler reads each module's `.js` file and passes its content to the code generator.
+- The module `.js` files are read as plain text at compile time; they are never executed directly by Node, so no `package.json` with `"type": "commonjs"` is needed alongside them.
+- The code generator tracks declared variable names per scope and emits `let` for first-use assignments (`VarAssign`), making the output valid in ESM strict mode.
+
+**Constraints:**
+- Module `.js` files must use `module.exports = { ... }` (existing convention).
+- Inlined modules that themselves `require()` Node built-ins (e.g. `fs`) remain valid for Node targets. Third-party npm `require()` calls inside a module are left as-is and must be satisfied at runtime.
+
 ## Bundled modules
 
 ### `core`
@@ -169,7 +194,6 @@ Located at `neo_mods/core/`. Provides essential I/O and conversion functions:
 | Function | Signature | Description |
 |---|---|---|
 | `Print` | `(message As String)` | Print a line to stdout |
-| `Input` | `() As String` | Read a line from stdin |
 | `Str` | `(val As Int) As String` | Convert Int to String |
 | `StrF` | `(val As Float) As String` | Convert Float to String |
 | `Val` | `(s As String) As Int` | Parse String to Int |

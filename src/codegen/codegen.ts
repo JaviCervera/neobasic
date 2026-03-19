@@ -5,8 +5,8 @@ import { CheckResult, CheckerEnv } from "../checker/checker.js";
 import { NbType } from "../checker/types.js";
 
 export interface CodegenOptions {
-  /** Module imports: module name → relative path to .js file */
-  moduleImports?: Map<string, string>;
+  /** Module name → JS source, inlined as an IIFE in the generated output. */
+  moduleContents?: Map<string, string>;
 }
 
 export function generate(program: Program, checkResult: CheckResult, options?: CodegenOptions): string {
@@ -14,6 +14,10 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
   let indent = 0;
   const env = checkResult.env;
   const exprTypes = checkResult.exprTypes;
+
+  // Tracks variable names that have been declared with let/const in the current scope,
+  // so that type-inferred assignments (VarAssign) emit `let` only on first use.
+  let declaredVars = new Set<string>();
 
   function emit(line: string): void {
     lines.push("  ".repeat(indent) + line);
@@ -29,13 +33,17 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
 
   // ── Module imports ──────────────────────────────────────────
 
-  if (options?.moduleImports) {
-    for (const [moduleName, jsPath] of options.moduleImports) {
-      emit(`const ${id(moduleName)} = require(${JSON.stringify(jsPath)});`);
+  if (options?.moduleContents && options.moduleContents.size > 0) {
+    for (const [moduleName, jsSource] of options.moduleContents) {
+      emit(`const ${id(moduleName)} = (() => {`);
+      emitRaw(`  const module = { exports: {} };`);
+      for (const line of jsSource.trimEnd().split("\n")) {
+        emitRaw(line.length > 0 ? `  ${line}` : "");
+      }
+      emitRaw(`  return module.exports;`);
+      emit(`})();`);
     }
-    if (options.moduleImports.size > 0) {
-      emitRaw("");
-    }
+    emitRaw("");
   }
 
   // ── Type factories ────────────────────────────────────────
@@ -89,12 +97,19 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
     switch (stmt.kind) {
       case "VarDecl": {
         const init = stmt.initializer ? emitExpr(stmt.initializer) : defaultValueForAnnotation(stmt.typeAnnotation);
+        declaredVars.add(id(stmt.name));
         emit(`let ${id(stmt.name)} = ${init};`);
         break;
       }
 
       case "VarAssign": {
-        emit(`${id(stmt.name)} = ${emitExpr(stmt.value)};`);
+        const varName = id(stmt.name);
+        if (!declaredVars.has(varName)) {
+          declaredVars.add(varName);
+          emit(`let ${varName} = ${emitExpr(stmt.value)};`);
+        } else {
+          emit(`${varName} = ${emitExpr(stmt.value)};`);
+        }
         break;
       }
 
@@ -119,6 +134,7 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
       }
 
       case "ConstDecl": {
+        declaredVars.add(id(stmt.name));
         emit(`const ${id(stmt.name)} = ${emitExpr(stmt.value)};`);
         break;
       }
@@ -227,7 +243,10 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
         const params = stmt.params.map(p => id(p.name)).join(", ");
         emit(`function ${id(stmt.name)}(${params}) {`);
         indent++;
+        const outerDeclaredVars = declaredVars;
+        declaredVars = new Set(stmt.params.map(p => id(p.name)));
         for (const s of stmt.body) emitStmt(s);
+        declaredVars = outerDeclaredVars;
         indent--;
         emit("}");
         emitRaw("");

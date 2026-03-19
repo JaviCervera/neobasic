@@ -3,8 +3,8 @@ import * as path from "node:path";
 import { lex } from "./lexer/index.js";
 import { parse, Program, Stmt } from "./parser/index.js";
 import { check, CheckResult, CheckerEnv, FuncSymbol, VarSymbol } from "./checker/index.js";
-import { generate, CodegenOptions } from "./codegen/index.js";
-import { resolveModule, ModuleDefinition } from "./modules/index.js";
+import { generate } from "./codegen/index.js";
+import { resolveModule } from "./modules/index.js";
 import { NeoBasicError } from "./errors.js";
 
 export interface CompileOptions {
@@ -56,8 +56,7 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   collectIncludes(mainAst.statements, absPath);
 
   // 3. Resolve modules
-  const moduleDefs: ModuleDefinition[] = [];
-  const moduleImports = new Map<string, string>();
+  const moduleContents = new Map<string, string>();
   const env: Partial<CheckerEnv> = {
     funcs: new Map<string, FuncSymbol>(),
     vars: new Map<string, VarSymbol>(),
@@ -66,8 +65,7 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   for (const stmt of importStmts) {
     if (stmt.kind === "ImportStmt") {
       const moduleDef = resolveModule(stmt.moduleName, cwd);
-      moduleDefs.push(moduleDef);
-      moduleImports.set(moduleDef.name, moduleDef.jsPath);
+      moduleContents.set(moduleDef.name, fs.readFileSync(moduleDef.jsPath, "utf-8"));
 
       // Register module functions
       for (const [name, func] of moduleDef.funcs) {
@@ -86,8 +84,7 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   const checkResult = check(program, absPath, env);
 
   // 5. Generate JS
-  const codegenOpts: CodegenOptions = { moduleImports };
-  const js = generate(program, checkResult, codegenOpts);
+  const js = generate(program, checkResult, { moduleContents });
 
   return { js, env: checkResult.env };
 }

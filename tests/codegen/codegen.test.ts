@@ -213,6 +213,53 @@ describe("Code Generator", () => {
     });
   });
 
+  describe("module imports", () => {
+    const coreFunc: FuncSymbol = {
+      params: [{ name: "message", type: STRING }],
+      returnType: VOID,
+      isExternal: true,
+      externalName: "core.print",
+    };
+
+    it("inlines module as IIFE", () => {
+      const funcs = new Map<string, FuncSymbol>([["print", coreFunc]]);
+      const tokens = lex('Print("hi")', undefined);
+      const ast = parse(tokens);
+      const result = check(ast, "<test>", { funcs });
+      const output = generate(ast, result, {
+        moduleContents: new Map([["core", 'module.exports = { print: function(m) {} };']]),
+      });
+      expect(output).toContain("const core = (() => {");
+      expect(output).toContain("const module = { exports: {} };");
+      expect(output).toContain("return module.exports;");
+      expect(output).toContain("})();");
+      expect(output).not.toContain("require(");
+    });
+
+    it("bundled output is executable and exposes module functions", () => {
+      const funcs = new Map<string, FuncSymbol>([["print", coreFunc]]);
+      const tokens = lex('Print("hi")', undefined);
+      const ast = parse(tokens);
+      const result = check(ast, "<test>", { funcs });
+      const output = generate(ast, result, {
+        moduleContents: new Map([["core", 'module.exports = { print: function(m) { return m; } };']]),
+      });
+      const fn = new Function(output);
+      expect(() => fn()).not.toThrow();
+    });
+  });
+
+  describe("variable scoping", () => {
+    it("emits let only once for variable first assigned inside an If block", () => {
+      const output = gen("a = 1\nIf a == 1\n  b = 10\nEndIf\nb = 20");
+      // b should get `let` on first assignment inside If, plain assignment outside
+      const lines = output.split("\n").map(l => l.trim());
+      expect(lines.filter(l => l === "let b = 10;")).toHaveLength(1);
+      expect(lines.filter(l => l === "b = 20;")).toHaveLength(1);
+      expect(lines.filter(l => l === "let b = 20;")).toHaveLength(0);
+    });
+  });
+
   describe("Null", () => {
     it("emits Null as null", () => {
       expectContains("Type Foo\n  X As Int\nEndType\na As Foo = Null", "let a = null;");

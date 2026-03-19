@@ -22,8 +22,3 @@ Print("Pi: " + StrF(pi))
 numStr = "21"
 num = Val(numStr) * 2
 Print(numStr + " * 2 = " + Str(num))
-
-' Interactive input (uncomment to use)
-' Print("What is your name?")
-' name = Input()
-' Print("Hello, " + name + "!")

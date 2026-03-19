@@ -5,6 +5,7 @@ import { lex } from "../../src/lexer/index.js";
 import { parse } from "../../src/parser/index.js";
 import { check, type CheckerEnv } from "../../src/checker/index.js";
 import { generate } from "../../src/codegen/index.js";
+import { compile } from "../../src/compiler.js";
 
 const FIXTURES = path.join(import.meta.dirname, "fixtures");
 
@@ -97,6 +98,25 @@ describe("Integration Tests", () => {
       expect(scope.total).toBe(15);     // For..In [1,2,3,4,5]
       expect(scope.count).toBe(3);      // Do..Loop with Exit at 3
       expect(scope.r).toBe(5);          // Repeat..Until
+    });
+  });
+
+  describe("module bundling", () => {
+    const moduleFixture = path.join(FIXTURES, "module-import.nb");
+
+    it("bundles module as IIFE", () => {
+      const result = compile(moduleFixture);
+      expect(result.js).toContain("const testmod = (() => {");
+      expect(result.js).toContain("const module = { exports: {} };");
+      expect(result.js).toContain("return module.exports;");
+      expect(result.js).toContain("})();");
+      expect(result.js).not.toContain("require(");
+    });
+
+    it("bundled output runs correctly", () => {
+      const result = compile(moduleFixture);
+      const fn = new Function(`${result.js}\nreturn { result };`);
+      expect(fn().result).toBe(42); // Double(21) = 42
     });
   });
 

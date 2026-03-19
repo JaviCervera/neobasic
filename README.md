@@ -44,7 +44,9 @@ npm test
 node dist/cli.js compile myprogram.nb
 ```
 
-This produces `myprogram.js` in the same directory. You can specify a different output path with `-o`:
+This produces a single self-contained `myprogram.js` in the same directory — all imported modules are inlined into the output, so you can copy it anywhere and run it without needing any companion files.
+
+You can specify a different output path with `-o`:
 
 ```bash
 node dist/cli.js compile myprogram.nb -o output/myprogram.js
@@ -55,8 +57,6 @@ Then run the output with Node:
 ```bash
 node myprogram.js
 ```
-
-> **Note:** Compiled `.js` files use CommonJS `require()`. If your output directory contains a `package.json` with `"type": "module"`, add a nested `package.json` with `{ "type": "commonjs" }` or rename the output to `.cjs`.
 
 ### Run the Hello World example
 
@@ -412,7 +412,7 @@ The string after `=` maps the NeoBasic name to the JavaScript function name.
 
 #### Module implementation (`.js`)
 
-Provide the actual JavaScript implementation in a file with the same base name:
+Provide the actual JavaScript implementation in a file with the same base name. Use `module.exports` to export the functions:
 
 ```javascript
 // File: ext.js
@@ -421,6 +421,8 @@ function foo(a) {
 }
 module.exports = { foo };
 ```
+
+By default the compiler inlines this file directly into the generated output (wrapped in an IIFE), so no separate deployment of the `.js` file is required.
 
 #### Module directory structure
 
@@ -448,7 +450,6 @@ NeoBasic ships with a bundled `core` module that provides essential I/O and type
 | Function | Signature | Description |
 |---|---|---|
 | `Print` | `(message As String)` | Print `message` followed by a newline |
-| `Input` | `() As String` | Read a line from stdin and return it |
 | `Str` | `(val As Int) As String` | Convert an `Int` to its string representation |
 | `StrF` | `(val As Float) As String` | Convert a `Float` to its string representation |
 | `Val` | `(s As String) As Int` | Parse a string as an `Int` (returns `0` on failure) |
@@ -460,7 +461,7 @@ Example:
 Import "core"
 
 Print("Enter a number:")
-n = Val(Input())
+n = Val("42")
 Print("Double: " + Str(n * 2))
 ```
 

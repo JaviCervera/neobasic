@@ -1,0 +1,1 @@
+Function Double(n As Int) As Int = "double"
