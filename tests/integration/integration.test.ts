@@ -120,6 +120,54 @@ describe("Integration Tests", () => {
     });
   });
 
+  describe("module types", () => {
+    const typedModFixture = path.join(FIXTURES, "module-types.nb");
+
+    it("compiles module with Type declarations", () => {
+      const result = compile(typedModFixture);
+      expect(result.js).toContain("const typedmod = (() => {");
+      // Type factories should be emitted for module types
+      expect(result.js).toContain("vec2$$new()");
+      expect(result.js).toContain("color$$new()");
+    });
+
+    it("module types are usable in compiled output", () => {
+      const result = compile(typedModFixture);
+      const fn = new Function(`${result.js}\nreturn { result, colorr, sum };`);
+      const scope = fn();
+      expect(scope.result).toBe("(4, 6)");
+      expect(scope.colorr).toBe(255);
+      expect(scope.sum).toEqual({ x: 4, y: 6 });
+    });
+  });
+
+  describe("async modules", () => {
+    const asyncFixture = path.join(FIXTURES, "async-module.nb");
+
+    it("wraps output in async IIFE when module is async", () => {
+      const result = compile(asyncFixture);
+      expect(result.js).toContain("(async () => {");
+      expect(result.js).toContain("await (async () => {");
+      expect(result.js).toContain("})();");
+    });
+
+    it("non-async modules remain synchronous even inside async wrapper", () => {
+      // Compile a file that uses both core (sync) and asyncmod (async)
+      const source = 'Import "core"\nImport "asyncmod"\nresult = AsyncDouble(5)';
+      const tmpFile = path.join(FIXTURES, "__tmp_async_test.nb");
+      fs.writeFileSync(tmpFile, source);
+      try {
+        const result = compile(tmpFile);
+        // core should be a sync IIFE (no await)
+        expect(result.js).toMatch(/const core = \(\(\) => \{/);
+        // asyncmod should be async
+        expect(result.js).toMatch(/const asyncmod = await \(async \(\) => \{/);
+      } finally {
+        fs.unlinkSync(tmpFile);
+      }
+    });
+  });
+
   describe("complex expressions", () => {
     it("integer division truncates", () => {
       const source = "a = 7 / 2";

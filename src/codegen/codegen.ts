@@ -7,6 +7,12 @@ import { NbType } from "../checker/types.js";
 export interface CodegenOptions {
   /** Module name → JS source, inlined as an IIFE in the generated output. */
   moduleContents?: Map<string, string>;
+  /** Module names that require async initialisation (WASM etc.). */
+  asyncModules?: Set<string>;
+  /** Wrap entire output in an async IIFE to support top-level await. */
+  async?: boolean;
+  /** Additional type definitions from modules (name → fields), emitted as type factories. */
+  moduleTypes?: Map<string, { fields: { name: string; type: NbType }[] }>;
 }
 
 export function generate(program: Program, checkResult: CheckResult, options?: CodegenOptions): string {
@@ -31,23 +37,59 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
     return name.toLowerCase();
   }
 
+  // ── Async wrapper (if needed) ────────────────────────────────
+
+  const needsAsync = options?.async ?? false;
+  if (needsAsync) {
+    emit("(async () => {");
+    indent++;
+  }
+
   // ── Module imports ──────────────────────────────────────────
 
   if (options?.moduleContents && options.moduleContents.size > 0) {
+    const asyncModules = options.asyncModules ?? new Set<string>();
     for (const [moduleName, jsSource] of options.moduleContents) {
-      emit(`const ${id(moduleName)} = (() => {`);
-      emitRaw(`  const module = { exports: {} };`);
-      for (const line of jsSource.trimEnd().split("\n")) {
-        emitRaw(line.length > 0 ? `  ${line}` : "");
+      const isAsyncModule = asyncModules.has(moduleName);
+      if (isAsyncModule) {
+        emit(`const ${id(moduleName)} = await (async () => {`);
+      } else {
+        emit(`const ${id(moduleName)} = (() => {`);
       }
-      emitRaw(`  return module.exports;`);
-      emit(`})();`);
+      indent++;
+      emit("const module = { exports: {} };");
+      for (const line of jsSource.trimEnd().split("\n")) {
+        emitRaw(line.length > 0 ? `${"  ".repeat(indent)}${line}` : "");
+      }
+      emit("return module.exports;");
+      indent--;
+      emit("})();");
     }
     emitRaw("");
   }
 
   // ── Type factories ────────────────────────────────────────
 
+  // Module-provided types
+  if (options?.moduleTypes) {
+    for (const [typeName, typeDef] of options.moduleTypes) {
+      const name = id(typeName);
+      emit(`function ${name}$$new() {`);
+      indent++;
+      emit("return {");
+      indent++;
+      for (const field of typeDef.fields) {
+        emit(`${id(field.name)}: ${defaultValueFor(field.type)},`);
+      }
+      indent--;
+      emit("};");
+      indent--;
+      emit("}");
+      emitRaw("");
+    }
+  }
+
+  // User-defined types
   for (const stmt of program.statements) {
     if (stmt.kind === "TypeDecl") {
       emitTypeFactory(stmt);
@@ -384,6 +426,13 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
       case "bool": return "false";
       default: return "null"; // UDT
     }
+  }
+
+  // ── Close async wrapper ─────────────────────────────────────
+
+  if (needsAsync) {
+    indent--;
+    emit("})();");
   }
 
   return lines.join("\n") + "\n";

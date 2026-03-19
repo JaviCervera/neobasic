@@ -1,0 +1,14 @@
+Import "raylib"
+
+InitWindow(800, 450, "NeoBasic — Raylib Example")
+SetTargetFPS(60)
+
+While Not WindowShouldClose()
+  BeginDrawing()
+  ClearBackground(RAYWHITE())
+  DrawText("Hello from NeoBasic!", 190, 200, 20, DARKGRAY())
+  DrawCircle(400, 300, 50.0, RED())
+  EndDrawing()
+EndWhile
+
+CloseWindow()

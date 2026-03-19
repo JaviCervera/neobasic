@@ -1,0 +1,16 @@
+Type Vec2
+  X As Float
+  Y As Float
+EndType
+
+Type Color
+  R As Int
+  G As Int
+  B As Int
+EndType
+
+Function MakeVec(x As Float, y As Float) As Vec2 = "makevec"
+Function AddVecs(a As Vec2, b As Vec2) As Vec2 = "addvecs"
+Function VecToStr(v As Vec2) As String = "vectostr"
+
+Const PI = 3

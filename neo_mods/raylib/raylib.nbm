@@ -1,0 +1,991 @@
+Async
+
+' ═══════════════════════════════════════════════════════════════════
+' NeoBasic Raylib Module — Type, Function & Constant Declarations
+' Based on raylib 5.0
+' ═══════════════════════════════════════════════════════════════════
+
+' ── Value Types ─────────────────────────────────────────────────
+
+Type Vector2
+  X As Float
+  Y As Float
+EndType
+
+Type Vector3
+  X As Float
+  Y As Float
+  Z As Float
+EndType
+
+Type Vector4
+  X As Float
+  Y As Float
+  Z As Float
+  W As Float
+EndType
+
+Type Color
+  R As Int
+  G As Int
+  B As Int
+  A As Int
+EndType
+
+Type Rectangle
+  X As Float
+  Y As Float
+  Width As Float
+  Height As Float
+EndType
+
+Type Camera2D
+  OffsetX As Float
+  OffsetY As Float
+  TargetX As Float
+  TargetY As Float
+  Rotation As Float
+  Zoom As Float
+EndType
+
+Type Camera3D
+  PosX As Float
+  PosY As Float
+  PosZ As Float
+  TargetX As Float
+  TargetY As Float
+  TargetZ As Float
+  UpX As Float
+  UpY As Float
+  UpZ As Float
+  Fovy As Float
+  Projection As Int
+EndType
+
+Type Ray
+  PosX As Float
+  PosY As Float
+  PosZ As Float
+  DirX As Float
+  DirY As Float
+  DirZ As Float
+EndType
+
+Type RayCollision
+  Hit As Bool
+  Distance As Float
+  PointX As Float
+  PointY As Float
+  PointZ As Float
+  NormalX As Float
+  NormalY As Float
+  NormalZ As Float
+EndType
+
+Type BoundingBox
+  MinX As Float
+  MinY As Float
+  MinZ As Float
+  MaxX As Float
+  MaxY As Float
+  MaxZ As Float
+EndType
+
+Type NPatchInfo
+  SourceX As Float
+  SourceY As Float
+  SourceW As Float
+  SourceH As Float
+  Left As Int
+  Top As Int
+  Right As Int
+  Bottom As Int
+  Layout As Int
+EndType
+
+Type Transform
+  TranslationX As Float
+  TranslationY As Float
+  TranslationZ As Float
+  RotationX As Float
+  RotationY As Float
+  RotationZ As Float
+  RotationW As Float
+  ScaleX As Float
+  ScaleY As Float
+  ScaleZ As Float
+EndType
+
+' ── Handle Types (opaque — created by load/gen functions) ──────
+
+Type Image
+  Width As Int
+  Height As Int
+  Mipmaps As Int
+  Format As Int
+EndType
+
+Type Texture
+  Id As Int
+  Width As Int
+  Height As Int
+  Mipmaps As Int
+  Format As Int
+EndType
+
+Type RenderTexture
+  Id As Int
+  TexWidth As Int
+  TexHeight As Int
+  DepthWidth As Int
+  DepthHeight As Int
+EndType
+
+Type Font
+  BaseSize As Int
+  GlyphCount As Int
+  GlyphPadding As Int
+EndType
+
+Type GlyphInfo
+  Value As Int
+  OffsetX As Int
+  OffsetY As Int
+  AdvanceX As Int
+EndType
+
+Type Sound
+  FrameCount As Int
+EndType
+
+Type Music
+  FrameCount As Int
+  Looping As Bool
+EndType
+
+Type Wave
+  FrameCount As Int
+  SampleRate As Int
+  SampleSize As Int
+  Channels As Int
+EndType
+
+Type AudioStream
+  SampleRate As Int
+  SampleSize As Int
+  Channels As Int
+EndType
+
+Type Shader
+  Id As Int
+EndType
+
+Type Model
+  MeshCount As Int
+  MaterialCount As Int
+  BoneCount As Int
+EndType
+
+Type Mesh
+  VertexCount As Int
+  TriangleCount As Int
+EndType
+
+Type Material
+  ShaderId As Int
+EndType
+
+Type ModelAnimation
+  BoneCount As Int
+  FrameCount As Int
+EndType
+
+Type BoneInfo
+  Name As String
+  Parent As Int
+EndType
+
+' ═══════════════════════════════════════════════════════════════════
+' Functions
+' ═══════════════════════════════════════════════════════════════════
+
+' ── Window management ──────────────────────────────────────────
+
+Function InitWindow(width As Int, height As Int, title As String) = "initWindow"
+Function CloseWindow() = "closeWindow"
+Function WindowShouldClose() As Bool = "windowShouldClose"
+Function IsWindowReady() As Bool = "isWindowReady"
+Function IsWindowFullscreen() As Bool = "isWindowFullscreen"
+Function IsWindowHidden() As Bool = "isWindowHidden"
+Function IsWindowMinimized() As Bool = "isWindowMinimized"
+Function IsWindowMaximized() As Bool = "isWindowMaximized"
+Function IsWindowFocused() As Bool = "isWindowFocused"
+Function IsWindowResized() As Bool = "isWindowResized"
+Function IsWindowState(flag As Int) As Bool = "isWindowState"
+Function SetWindowState(flags As Int) = "setWindowState"
+Function ClearWindowState(flags As Int) = "clearWindowState"
+Function ToggleFullscreen() = "toggleFullscreen"
+Function ToggleBorderlessWindowed() = "toggleBorderlessWindowed"
+Function MaximizeWindow() = "maximizeWindow"
+Function MinimizeWindow() = "minimizeWindow"
+Function RestoreWindow() = "restoreWindow"
+Function SetWindowTitle(title As String) = "setWindowTitle"
+Function SetWindowPosition(x As Int, y As Int) = "setWindowPosition"
+Function SetWindowMonitor(monitor As Int) = "setWindowMonitor"
+Function SetWindowMinSize(width As Int, height As Int) = "setWindowMinSize"
+Function SetWindowMaxSize(width As Int, height As Int) = "setWindowMaxSize"
+Function SetWindowSize(width As Int, height As Int) = "setWindowSize"
+Function SetWindowOpacity(opacity As Float) = "setWindowOpacity"
+Function SetWindowFocused() = "setWindowFocused"
+Function GetScreenWidth() As Int = "getScreenWidth"
+Function GetScreenHeight() As Int = "getScreenHeight"
+Function GetRenderWidth() As Int = "getRenderWidth"
+Function GetRenderHeight() As Int = "getRenderHeight"
+Function GetMonitorCount() As Int = "getMonitorCount"
+Function GetCurrentMonitor() As Int = "getCurrentMonitor"
+Function GetMonitorWidth(monitor As Int) As Int = "getMonitorWidth"
+Function GetMonitorHeight(monitor As Int) As Int = "getMonitorHeight"
+Function GetMonitorPhysicalWidth(monitor As Int) As Int = "getMonitorPhysicalWidth"
+Function GetMonitorPhysicalHeight(monitor As Int) As Int = "getMonitorPhysicalHeight"
+Function GetMonitorRefreshRate(monitor As Int) As Int = "getMonitorRefreshRate"
+Function GetMonitorName(monitor As Int) As String = "getMonitorName"
+Function SetClipboardText(text As String) = "setClipboardText"
+Function GetClipboardText() As String = "getClipboardText"
+Function EnableEventWaiting() = "enableEventWaiting"
+Function DisableEventWaiting() = "disableEventWaiting"
+
+' ── Cursor ─────────────────────────────────────────────────────
+
+Function ShowCursor() = "showCursor"
+Function HideCursor() = "hideCursor"
+Function IsCursorHidden() As Bool = "isCursorHidden"
+Function EnableCursor() = "enableCursor"
+Function DisableCursor() = "disableCursor"
+Function IsCursorOnScreen() As Bool = "isCursorOnScreen"
+
+' ── Drawing control ────────────────────────────────────────────
+
+Function ClearBackground(color As Color) = "clearBackground"
+Function BeginDrawing() = "beginDrawing"
+Function EndDrawing() = "endDrawing"
+Function BeginMode2D(camera As Camera2D) = "beginMode2D"
+Function EndMode2D() = "endMode2D"
+Function BeginMode3D(camera As Camera3D) = "beginMode3D"
+Function EndMode3D() = "endMode3D"
+Function BeginTextureMode(target As RenderTexture) = "beginTextureMode"
+Function EndTextureMode() = "endTextureMode"
+Function BeginShaderMode(shader As Shader) = "beginShaderMode"
+Function EndShaderMode() = "endShaderMode"
+Function BeginBlendMode(mode As Int) = "beginBlendMode"
+Function EndBlendMode() = "endBlendMode"
+Function BeginScissorMode(x As Int, y As Int, width As Int, height As Int) = "beginScissorMode"
+Function EndScissorMode() = "endScissorMode"
+
+' ── Timing ─────────────────────────────────────────────────────
+
+Function SetTargetFPS(fps As Int) = "setTargetFPS"
+Function GetFPS() As Int = "getFPS"
+Function GetFrameTime() As Float = "getFrameTime"
+Function GetTime() As Float = "getTime"
+
+' ── Configuration ──────────────────────────────────────────────
+
+Function SetConfigFlags(flags As Int) = "setConfigFlags"
+Function SetTraceLogLevel(logLevel As Int) = "setTraceLogLevel"
+Function TakeScreenshot(fileName As String) = "takeScreenshot"
+Function OpenURL(url As String) = "openURL"
+Function SetRandomSeed(seed As Int) = "setRandomSeed"
+Function GetRandomValue(min As Int, max As Int) As Int = "getRandomValue"
+
+' ── Input: Keyboard ────────────────────────────────────────────
+
+Function IsKeyPressed(key As Int) As Bool = "isKeyPressed"
+Function IsKeyPressedRepeat(key As Int) As Bool = "isKeyPressedRepeat"
+Function IsKeyDown(key As Int) As Bool = "isKeyDown"
+Function IsKeyReleased(key As Int) As Bool = "isKeyReleased"
+Function IsKeyUp(key As Int) As Bool = "isKeyUp"
+Function GetKeyPressed() As Int = "getKeyPressed"
+Function GetCharPressed() As Int = "getCharPressed"
+
+' ── Input: Mouse ───────────────────────────────────────────────
+
+Function IsMouseButtonPressed(button As Int) As Bool = "isMouseButtonPressed"
+Function IsMouseButtonDown(button As Int) As Bool = "isMouseButtonDown"
+Function IsMouseButtonReleased(button As Int) As Bool = "isMouseButtonReleased"
+Function IsMouseButtonUp(button As Int) As Bool = "isMouseButtonUp"
+Function GetMouseX() As Int = "getMouseX"
+Function GetMouseY() As Int = "getMouseY"
+Function GetMousePosition() As Vector2 = "getMousePosition"
+Function GetMouseDelta() As Vector2 = "getMouseDelta"
+Function SetMousePosition(x As Int, y As Int) = "setMousePosition"
+Function SetMouseOffset(offsetX As Int, offsetY As Int) = "setMouseOffset"
+Function SetMouseScale(scaleX As Float, scaleY As Float) = "setMouseScale"
+Function GetMouseWheelMove() As Float = "getMouseWheelMove"
+Function GetMouseWheelMoveV() As Vector2 = "getMouseWheelMoveV"
+Function SetMouseCursor(cursor As Int) = "setMouseCursor"
+
+' ── Input: Gamepad ─────────────────────────────────────────────
+
+Function IsGamepadAvailable(gamepad As Int) As Bool = "isGamepadAvailable"
+Function GetGamepadName(gamepad As Int) As String = "getGamepadName"
+Function IsGamepadButtonPressed(gamepad As Int, button As Int) As Bool = "isGamepadButtonPressed"
+Function IsGamepadButtonDown(gamepad As Int, button As Int) As Bool = "isGamepadButtonDown"
+Function IsGamepadButtonReleased(gamepad As Int, button As Int) As Bool = "isGamepadButtonReleased"
+Function IsGamepadButtonUp(gamepad As Int, button As Int) As Bool = "isGamepadButtonUp"
+Function GetGamepadButtonPressed() As Int = "getGamepadButtonPressed"
+Function GetGamepadAxisCount(gamepad As Int) As Int = "getGamepadAxisCount"
+Function GetGamepadAxisMovement(gamepad As Int, axis As Int) As Float = "getGamepadAxisMovement"
+
+' ── Input: Touch ───────────────────────────────────────────────
+
+Function GetTouchX() As Int = "getTouchX"
+Function GetTouchY() As Int = "getTouchY"
+Function GetTouchPosition(index As Int) As Vector2 = "getTouchPosition"
+Function GetTouchPointId(index As Int) As Int = "getTouchPointId"
+Function GetTouchPointCount() As Int = "getTouchPointCount"
+
+' ── Shapes: Basic ──────────────────────────────────────────────
+
+Function DrawPixel(posX As Int, posY As Int, color As Color) = "drawPixel"
+Function DrawPixelV(position As Vector2, color As Color) = "drawPixelV"
+Function DrawLine(startPosX As Int, startPosY As Int, endPosX As Int, endPosY As Int, color As Color) = "drawLine"
+Function DrawLineV(startPos As Vector2, endPos As Vector2, color As Color) = "drawLineV"
+Function DrawLineEx(startPos As Vector2, endPos As Vector2, thick As Float, color As Color) = "drawLineEx"
+Function DrawLineBezier(startPos As Vector2, endPos As Vector2, thick As Float, color As Color) = "drawLineBezier"
+Function DrawCircle(centerX As Int, centerY As Int, radius As Float, color As Color) = "drawCircle"
+Function DrawCircleV(center As Vector2, radius As Float, color As Color) = "drawCircleV"
+Function DrawCircleLines(centerX As Int, centerY As Int, radius As Float, color As Color) = "drawCircleLines"
+Function DrawCircleLinesV(center As Vector2, radius As Float, color As Color) = "drawCircleLinesV"
+Function DrawCircleSector(center As Vector2, radius As Float, startAngle As Float, endAngle As Float, segments As Int, color As Color) = "drawCircleSector"
+Function DrawCircleSectorLines(center As Vector2, radius As Float, startAngle As Float, endAngle As Float, segments As Int, color As Color) = "drawCircleSectorLines"
+Function DrawCircleGradient(centerX As Int, centerY As Int, radius As Float, color1 As Color, color2 As Color) = "drawCircleGradient"
+Function DrawEllipse(centerX As Int, centerY As Int, radiusH As Float, radiusV As Float, color As Color) = "drawEllipse"
+Function DrawEllipseLines(centerX As Int, centerY As Int, radiusH As Float, radiusV As Float, color As Color) = "drawEllipseLines"
+Function DrawRing(center As Vector2, innerRadius As Float, outerRadius As Float, startAngle As Float, endAngle As Float, segments As Int, color As Color) = "drawRing"
+Function DrawRingLines(center As Vector2, innerRadius As Float, outerRadius As Float, startAngle As Float, endAngle As Float, segments As Int, color As Color) = "drawRingLines"
+Function DrawRectangle(posX As Int, posY As Int, width As Int, height As Int, color As Color) = "drawRectangle"
+Function DrawRectangleV(position As Vector2, size As Vector2, color As Color) = "drawRectangleV"
+Function DrawRectangleRec(rec As Rectangle, color As Color) = "drawRectangleRec"
+Function DrawRectanglePro(rec As Rectangle, origin As Vector2, rotation As Float, color As Color) = "drawRectanglePro"
+Function DrawRectangleGradientV(posX As Int, posY As Int, width As Int, height As Int, color1 As Color, color2 As Color) = "drawRectangleGradientV"
+Function DrawRectangleGradientH(posX As Int, posY As Int, width As Int, height As Int, color1 As Color, color2 As Color) = "drawRectangleGradientH"
+Function DrawRectangleGradientEx(rec As Rectangle, col1 As Color, col2 As Color, col3 As Color, col4 As Color) = "drawRectangleGradientEx"
+Function DrawRectangleLines(posX As Int, posY As Int, width As Int, height As Int, color As Color) = "drawRectangleLines"
+Function DrawRectangleLinesEx(rec As Rectangle, lineThick As Float, color As Color) = "drawRectangleLinesEx"
+Function DrawRectangleRounded(rec As Rectangle, roundness As Float, segments As Int, color As Color) = "drawRectangleRounded"
+Function DrawRectangleRoundedLines(rec As Rectangle, roundness As Float, segments As Int, color As Color) = "drawRectangleRoundedLines"
+Function DrawRectangleRoundedLinesEx(rec As Rectangle, roundness As Float, segments As Int, lineThick As Float, color As Color) = "drawRectangleRoundedLinesEx"
+Function DrawTriangle(v1 As Vector2, v2 As Vector2, v3 As Vector2, color As Color) = "drawTriangle"
+Function DrawTriangleLines(v1 As Vector2, v2 As Vector2, v3 As Vector2, color As Color) = "drawTriangleLines"
+Function DrawPoly(center As Vector2, sides As Int, radius As Float, rotation As Float, color As Color) = "drawPoly"
+Function DrawPolyLines(center As Vector2, sides As Int, radius As Float, rotation As Float, color As Color) = "drawPolyLines"
+Function DrawPolyLinesEx(center As Vector2, sides As Int, radius As Float, rotation As Float, lineThick As Float, color As Color) = "drawPolyLinesEx"
+
+' ── Shapes: Splines ────────────────────────────────────────────
+
+Function DrawSplineLinear(p1 As Vector2, p2 As Vector2, thick As Float, color As Color) = "drawSplineLinear"
+Function DrawSplineBasis(p1 As Vector2, p2 As Vector2, p3 As Vector2, p4 As Vector2, thick As Float, color As Color) = "drawSplineBasis"
+Function DrawSplineCatmullRom(p1 As Vector2, p2 As Vector2, p3 As Vector2, p4 As Vector2, thick As Float, color As Color) = "drawSplineCatmullRom"
+Function DrawSplineBezierQuadratic(p1 As Vector2, p2 As Vector2, p3 As Vector2, thick As Float, color As Color) = "drawSplineBezierQuadratic"
+Function DrawSplineBezierCubic(p1 As Vector2, p2 As Vector2, p3 As Vector2, p4 As Vector2, thick As Float, color As Color) = "drawSplineBezierCubic"
+
+' ── Collision (2D) ─────────────────────────────────────────────
+
+Function CheckCollisionRecs(rec1 As Rectangle, rec2 As Rectangle) As Bool = "checkCollisionRecs"
+Function CheckCollisionCircles(center1 As Vector2, radius1 As Float, center2 As Vector2, radius2 As Float) As Bool = "checkCollisionCircles"
+Function CheckCollisionCircleRec(center As Vector2, radius As Float, rec As Rectangle) As Bool = "checkCollisionCircleRec"
+Function CheckCollisionPointRec(point As Vector2, rec As Rectangle) As Bool = "checkCollisionPointRec"
+Function CheckCollisionPointCircle(point As Vector2, center As Vector2, radius As Float) As Bool = "checkCollisionPointCircle"
+Function CheckCollisionPointTriangle(point As Vector2, p1 As Vector2, p2 As Vector2, p3 As Vector2) As Bool = "checkCollisionPointTriangle"
+Function CheckCollisionPointLine(point As Vector2, p1 As Vector2, p2 As Vector2, threshold As Int) As Bool = "checkCollisionPointLine"
+Function GetCollisionRec(rec1 As Rectangle, rec2 As Rectangle) As Rectangle = "getCollisionRec"
+
+' ── Texture: Image loading ─────────────────────────────────────
+
+Function LoadImage(fileName As String) As Image = "loadImage"
+Function LoadImageRaw(fileName As String, width As Int, height As Int, format As Int, headerSize As Int) As Image = "loadImageRaw"
+Function LoadImageSvg(fileNameOrString As String, width As Int, height As Int) As Image = "loadImageSvg"
+Function LoadImageFromTexture(texture As Texture) As Image = "loadImageFromTexture"
+Function LoadImageFromScreen() As Image = "loadImageFromScreen"
+Function IsImageReady(image As Image) As Bool = "isImageReady"
+Function UnloadImage(image As Image) = "unloadImage"
+Function ExportImage(image As Image, fileName As String) As Bool = "exportImage"
+
+' ── Texture: Image generation ──────────────────────────────────
+
+Function GenImageColor(width As Int, height As Int, color As Color) As Image = "genImageColor"
+Function GenImageGradientLinear(width As Int, height As Int, direction As Int, start As Color, endColor As Color) As Image = "genImageGradientLinear"
+Function GenImageGradientRadial(width As Int, height As Int, density As Float, inner As Color, outer As Color) As Image = "genImageGradientRadial"
+Function GenImageGradientSquare(width As Int, height As Int, density As Float, inner As Color, outer As Color) As Image = "genImageGradientSquare"
+Function GenImageChecked(width As Int, height As Int, checksX As Int, checksY As Int, col1 As Color, col2 As Color) As Image = "genImageChecked"
+Function GenImageWhiteNoise(width As Int, height As Int, factor As Float) As Image = "genImageWhiteNoise"
+Function GenImagePerlinNoise(width As Int, height As Int, offsetX As Int, offsetY As Int, scale As Float) As Image = "genImagePerlinNoise"
+Function GenImageCellular(width As Int, height As Int, tileSize As Int) As Image = "genImageCellular"
+Function GenImageText(width As Int, height As Int, text As String) As Image = "genImageText"
+
+' ── Texture: Image manipulation ────────────────────────────────
+
+Function ImageCopy(image As Image) As Image = "imageCopy"
+Function ImageFromImage(image As Image, rec As Rectangle) As Image = "imageFromImage"
+Function ImageFormat(image As Image, newFormat As Int) = "imageFormat"
+Function ImageToPOT(image As Image, fill As Color) = "imageToPOT"
+Function ImageCrop(image As Image, crop As Rectangle) = "imageCrop"
+Function ImageAlphaCrop(image As Image, threshold As Float) = "imageAlphaCrop"
+Function ImageAlphaClear(image As Image, color As Color, threshold As Float) = "imageAlphaClear"
+Function ImageAlphaPremultiply(image As Image) = "imageAlphaPremultiply"
+Function ImageBlurGaussian(image As Image, size As Int) = "imageBlurGaussian"
+Function ImageResize(image As Image, newWidth As Int, newHeight As Int) = "imageResize"
+Function ImageResizeNN(image As Image, newWidth As Int, newHeight As Int) = "imageResizeNN"
+Function ImageResizeCanvas(image As Image, newWidth As Int, newHeight As Int, offsetX As Int, offsetY As Int, fill As Color) = "imageResizeCanvas"
+Function ImageMipmaps(image As Image) = "imageMipmaps"
+Function ImageDither(image As Image, rBpp As Int, gBpp As Int, bBpp As Int, aBpp As Int) = "imageDither"
+Function ImageFlipVertical(image As Image) = "imageFlipVertical"
+Function ImageFlipHorizontal(image As Image) = "imageFlipHorizontal"
+Function ImageRotate(image As Image, degrees As Int) = "imageRotate"
+Function ImageRotateCW(image As Image) = "imageRotateCW"
+Function ImageRotateCCW(image As Image) = "imageRotateCCW"
+Function ImageColorTint(image As Image, color As Color) = "imageColorTint"
+Function ImageColorInvert(image As Image) = "imageColorInvert"
+Function ImageColorGrayscale(image As Image) = "imageColorGrayscale"
+Function ImageColorContrast(image As Image, contrast As Float) = "imageColorContrast"
+Function ImageColorBrightness(image As Image, brightness As Int) = "imageColorBrightness"
+Function ImageColorReplace(image As Image, color As Color, replace As Color) = "imageColorReplace"
+Function ImageClearBackground(image As Image, color As Color) = "imageClearBackground"
+Function ImageDrawPixel(image As Image, posX As Int, posY As Int, color As Color) = "imageDrawPixel"
+Function ImageDrawPixelV(image As Image, position As Vector2, color As Color) = "imageDrawPixelV"
+Function ImageDrawLine(image As Image, startPosX As Int, startPosY As Int, endPosX As Int, endPosY As Int, color As Color) = "imageDrawLine"
+Function ImageDrawLineV(image As Image, start As Vector2, endPos As Vector2, color As Color) = "imageDrawLineV"
+Function ImageDrawCircle(image As Image, centerX As Int, centerY As Int, radius As Int, color As Color) = "imageDrawCircle"
+Function ImageDrawCircleV(image As Image, center As Vector2, radius As Int, color As Color) = "imageDrawCircleV"
+Function ImageDrawCircleLines(image As Image, centerX As Int, centerY As Int, radius As Int, color As Color) = "imageDrawCircleLines"
+Function ImageDrawCircleLinesV(image As Image, center As Vector2, radius As Int, color As Color) = "imageDrawCircleLinesV"
+Function ImageDrawRectangle(image As Image, posX As Int, posY As Int, width As Int, height As Int, color As Color) = "imageDrawRectangle"
+Function ImageDrawRectangleV(image As Image, position As Vector2, size As Vector2, color As Color) = "imageDrawRectangleV"
+Function ImageDrawRectangleRec(image As Image, rec As Rectangle, color As Color) = "imageDrawRectangleRec"
+Function ImageDrawRectangleLines(image As Image, rec As Rectangle, thick As Int, color As Color) = "imageDrawRectangleLines"
+Function ImageDraw(dst As Image, src As Image, srcRec As Rectangle, dstRec As Rectangle, tint As Color) = "imageDraw"
+Function ImageDrawText(dst As Image, text As String, posX As Int, posY As Int, fontSize As Int, color As Color) = "imageDrawText"
+Function ImageDrawTextEx(dst As Image, font As Font, text As String, position As Vector2, fontSize As Float, spacing As Float, tint As Color) = "imageDrawTextEx"
+
+' ── Texture: Loading ───────────────────────────────────────────
+
+Function LoadTexture(fileName As String) As Texture = "loadTexture"
+Function LoadTextureFromImage(image As Image) As Texture = "loadTextureFromImage"
+Function LoadTextureCubemap(image As Image, layout As Int) As Texture = "loadTextureCubemap"
+Function LoadRenderTexture(width As Int, height As Int) As RenderTexture = "loadRenderTexture"
+Function IsTextureReady(texture As Texture) As Bool = "isTextureReady"
+Function UnloadTexture(texture As Texture) = "unloadTexture"
+Function IsRenderTextureReady(target As RenderTexture) As Bool = "isRenderTextureReady"
+Function UnloadRenderTexture(target As RenderTexture) = "unloadRenderTexture"
+Function UpdateTexture(texture As Texture, pixels As Image) = "updateTexture"
+Function GenTextureMipmaps(texture As Texture) = "genTextureMipmaps"
+Function SetTextureFilter(texture As Texture, filter As Int) = "setTextureFilter"
+Function SetTextureWrap(texture As Texture, wrap As Int) = "setTextureWrap"
+
+' ── Texture: Drawing ───────────────────────────────────────────
+
+Function DrawTexture(texture As Texture, posX As Int, posY As Int, tint As Color) = "drawTexture"
+Function DrawTextureV(texture As Texture, position As Vector2, tint As Color) = "drawTextureV"
+Function DrawTextureEx(texture As Texture, position As Vector2, rotation As Float, scale As Float, tint As Color) = "drawTextureEx"
+Function DrawTextureRec(texture As Texture, source As Rectangle, position As Vector2, tint As Color) = "drawTextureRec"
+Function DrawTexturePro(texture As Texture, source As Rectangle, dest As Rectangle, origin As Vector2, rotation As Float, tint As Color) = "drawTexturePro"
+Function DrawTextureNPatch(texture As Texture, nPatchInfo As NPatchInfo, dest As Rectangle, origin As Vector2, rotation As Float, tint As Color) = "drawTextureNPatch"
+
+' ── Text: Font loading ─────────────────────────────────────────
+
+Function GetFontDefault() As Font = "getFontDefault"
+Function LoadFont(fileName As String) As Font = "loadFont"
+Function LoadFontEx(fileName As String, fontSize As Int, codepoints As Int, codepointCount As Int) As Font = "loadFontEx"
+Function LoadFontFromImage(image As Image, key As Color, firstChar As Int) As Font = "loadFontFromImage"
+Function IsFontReady(font As Font) As Bool = "isFontReady"
+Function UnloadFont(font As Font) = "unloadFont"
+
+' ── Text: Drawing ──────────────────────────────────────────────
+
+Function DrawFPS(posX As Int, posY As Int) = "drawFPS"
+Function DrawText(text As String, posX As Int, posY As Int, fontSize As Int, color As Color) = "drawText"
+Function DrawTextEx(font As Font, text As String, position As Vector2, fontSize As Float, spacing As Float, tint As Color) = "drawTextEx"
+Function DrawTextPro(font As Font, text As String, position As Vector2, origin As Vector2, rotation As Float, fontSize As Float, spacing As Float, tint As Color) = "drawTextPro"
+
+' ── Text: Metrics ──────────────────────────────────────────────
+
+Function SetTextLineSpacing(spacing As Int) = "setTextLineSpacing"
+Function MeasureText(text As String, fontSize As Int) As Int = "measureText"
+Function MeasureTextEx(font As Font, text As String, fontSize As Float, spacing As Float) As Vector2 = "measureTextEx"
+
+' ── Text: Helpers ──────────────────────────────────────────────
+
+Function TextSubtext(text As String, position As Int, length As Int) As String = "textSubtext"
+Function TextReplace(text As String, replace As String, by As String) As String = "textReplace"
+Function TextInsert(text As String, insert As String, position As Int) As String = "textInsert"
+Function TextFindIndex(text As String, find As String) As Int = "textFindIndex"
+Function TextToUpper(text As String) As String = "textToUpper"
+Function TextToLower(text As String) As String = "textToLower"
+Function TextToPascal(text As String) As String = "textToPascal"
+Function TextToInteger(text As String) As Int = "textToInteger"
+Function TextToFloat(text As String) As Float = "textToFloat"
+
+' ── 3D: Basic shapes ──────────────────────────────────────────
+
+Function DrawLine3D(startPos As Vector3, endPos As Vector3, color As Color) = "drawLine3D"
+Function DrawPoint3D(position As Vector3, color As Color) = "drawPoint3D"
+Function DrawCircle3D(center As Vector3, radius As Float, rotationAxis As Vector3, rotationAngle As Float, color As Color) = "drawCircle3D"
+Function DrawTriangle3D(v1 As Vector3, v2 As Vector3, v3 As Vector3, color As Color) = "drawTriangle3D"
+Function DrawCube(position As Vector3, width As Float, height As Float, length As Float, color As Color) = "drawCube"
+Function DrawCubeV(position As Vector3, size As Vector3, color As Color) = "drawCubeV"
+Function DrawCubeWires(position As Vector3, width As Float, height As Float, length As Float, color As Color) = "drawCubeWires"
+Function DrawCubeWiresV(position As Vector3, size As Vector3, color As Color) = "drawCubeWiresV"
+Function DrawSphere(centerPos As Vector3, radius As Float, color As Color) = "drawSphere"
+Function DrawSphereEx(centerPos As Vector3, radius As Float, rings As Int, slices As Int, color As Color) = "drawSphereEx"
+Function DrawSphereWires(centerPos As Vector3, radius As Float, rings As Int, slices As Int, color As Color) = "drawSphereWires"
+Function DrawCylinder(position As Vector3, radiusTop As Float, radiusBottom As Float, height As Float, slices As Int, color As Color) = "drawCylinder"
+Function DrawCylinderEx(startPos As Vector3, endPos As Vector3, startRadius As Float, endRadius As Float, sides As Int, color As Color) = "drawCylinderEx"
+Function DrawCylinderWires(position As Vector3, radiusTop As Float, radiusBottom As Float, height As Float, slices As Int, color As Color) = "drawCylinderWires"
+Function DrawCylinderWiresEx(startPos As Vector3, endPos As Vector3, startRadius As Float, endRadius As Float, sides As Int, color As Color) = "drawCylinderWiresEx"
+Function DrawCapsule(startPos As Vector3, endPos As Vector3, radius As Float, slices As Int, rings As Int, color As Color) = "drawCapsule"
+Function DrawCapsuleWires(startPos As Vector3, endPos As Vector3, radius As Float, slices As Int, rings As Int, color As Color) = "drawCapsuleWires"
+Function DrawPlane(centerPos As Vector3, size As Vector2, color As Color) = "drawPlane"
+Function DrawRay(ray As Ray, color As Color) = "drawRay"
+Function DrawGrid(slices As Int, spacing As Float) = "drawGrid"
+
+' ── 3D: Model loading ─────────────────────────────────────────
+
+Function LoadModel(fileName As String) As Model = "loadModel"
+Function LoadModelFromMesh(mesh As Mesh) As Model = "loadModelFromMesh"
+Function IsModelReady(model As Model) As Bool = "isModelReady"
+Function UnloadModel(model As Model) = "unloadModel"
+Function GetModelBoundingBox(model As Model) As BoundingBox = "getModelBoundingBox"
+
+' ── 3D: Mesh generation ───────────────────────────────────────
+
+Function GenMeshPoly(sides As Int, radius As Float) As Mesh = "genMeshPoly"
+Function GenMeshPlane(width As Float, length As Float, resX As Int, resZ As Int) As Mesh = "genMeshPlane"
+Function GenMeshCube(width As Float, height As Float, length As Float) As Mesh = "genMeshCube"
+Function GenMeshSphere(radius As Float, rings As Int, slices As Int) As Mesh = "genMeshSphere"
+Function GenMeshHemiSphere(radius As Float, rings As Int, slices As Int) As Mesh = "genMeshHemiSphere"
+Function GenMeshCylinder(radius As Float, height As Float, slices As Int) As Mesh = "genMeshCylinder"
+Function GenMeshCone(radius As Float, height As Float, slices As Int) As Mesh = "genMeshCone"
+Function GenMeshTorus(radius As Float, size As Float, radSeg As Int, sides As Int) As Mesh = "genMeshTorus"
+Function GenMeshKnot(radius As Float, size As Float, radSeg As Int, sides As Int) As Mesh = "genMeshKnot"
+Function UnloadMesh(mesh As Mesh) = "unloadMesh"
+Function ExportMesh(mesh As Mesh, fileName As String) As Bool = "exportMesh"
+Function GetMeshBoundingBox(mesh As Mesh) As BoundingBox = "getMeshBoundingBox"
+Function GenMeshTangents(mesh As Mesh) = "genMeshTangents"
+
+' ── 3D: Materials ──────────────────────────────────────────────
+
+Function LoadMaterialDefault() As Material = "loadMaterialDefault"
+Function IsMaterialReady(material As Material) As Bool = "isMaterialReady"
+Function UnloadMaterial(material As Material) = "unloadMaterial"
+Function SetMaterialTexture(material As Material, mapType As Int, texture As Texture) = "setMaterialTexture"
+Function SetModelMeshMaterial(model As Model, meshId As Int, materialId As Int) = "setModelMeshMaterial"
+
+' ── 3D: Model animation ───────────────────────────────────────
+
+Function UpdateModelAnimation(model As Model, anim As ModelAnimation, frame As Int) = "updateModelAnimation"
+Function UnloadModelAnimation(anim As ModelAnimation) = "unloadModelAnimation"
+Function IsModelAnimationValid(model As Model, anim As ModelAnimation) As Bool = "isModelAnimationValid"
+
+' ── 3D: Collision ──────────────────────────────────────────────
+
+Function CheckCollisionSpheres(center1 As Vector3, radius1 As Float, center2 As Vector3, radius2 As Float) As Bool = "checkCollisionSpheres"
+Function CheckCollisionBoxes(box1 As BoundingBox, box2 As BoundingBox) As Bool = "checkCollisionBoxes"
+Function CheckCollisionBoxSphere(box As BoundingBox, center As Vector3, radius As Float) As Bool = "checkCollisionBoxSphere"
+Function GetRayCollisionSphere(ray As Ray, center As Vector3, radius As Float) As RayCollision = "getRayCollisionSphere"
+Function GetRayCollisionBox(ray As Ray, box As BoundingBox) As RayCollision = "getRayCollisionBox"
+Function GetRayCollisionMesh(ray As Ray, mesh As Mesh, transform As Transform) As RayCollision = "getRayCollisionMesh"
+Function GetRayCollisionTriangle(ray As Ray, p1 As Vector3, p2 As Vector3, p3 As Vector3) As RayCollision = "getRayCollisionTriangle"
+Function GetRayCollisionQuad(ray As Ray, p1 As Vector3, p2 As Vector3, p3 As Vector3, p4 As Vector3) As RayCollision = "getRayCollisionQuad"
+
+' ── Audio: Device ──────────────────────────────────────────────
+
+Function InitAudioDevice() = "initAudioDevice"
+Function CloseAudioDevice() = "closeAudioDevice"
+Function IsAudioDeviceReady() As Bool = "isAudioDeviceReady"
+Function SetMasterVolume(volume As Float) = "setMasterVolume"
+Function GetMasterVolume() As Float = "getMasterVolume"
+
+' ── Audio: Sound ───────────────────────────────────────────────
+
+Function LoadWave(fileName As String) As Wave = "loadWave"
+Function IsWaveReady(wave As Wave) As Bool = "isWaveReady"
+Function LoadSound(fileName As String) As Sound = "loadSound"
+Function LoadSoundFromWave(wave As Wave) As Sound = "loadSoundFromWave"
+Function LoadSoundAlias(source As Sound) As Sound = "loadSoundAlias"
+Function IsSoundReady(sound As Sound) As Bool = "isSoundReady"
+Function UnloadWave(wave As Wave) = "unloadWave"
+Function UnloadSound(sound As Sound) = "unloadSound"
+Function UnloadSoundAlias(alias As Sound) = "unloadSoundAlias"
+Function ExportWave(wave As Wave, fileName As String) As Bool = "exportWave"
+Function PlaySound(sound As Sound) = "playSound"
+Function StopSound(sound As Sound) = "stopSound"
+Function PauseSound(sound As Sound) = "pauseSound"
+Function ResumeSound(sound As Sound) = "resumeSound"
+Function IsSoundPlaying(sound As Sound) As Bool = "isSoundPlaying"
+Function SetSoundVolume(sound As Sound, volume As Float) = "setSoundVolume"
+Function SetSoundPitch(sound As Sound, pitch As Float) = "setSoundPitch"
+Function SetSoundPan(sound As Sound, pan As Float) = "setSoundPan"
+
+' ── Audio: Music ───────────────────────────────────────────────
+
+Function LoadMusicStream(fileName As String) As Music = "loadMusicStream"
+Function IsMusicReady(music As Music) As Bool = "isMusicReady"
+Function UnloadMusicStream(music As Music) = "unloadMusicStream"
+Function PlayMusicStream(music As Music) = "playMusicStream"
+Function IsMusicStreamPlaying(music As Music) As Bool = "isMusicStreamPlaying"
+Function UpdateMusicStream(music As Music) = "updateMusicStream"
+Function StopMusicStream(music As Music) = "stopMusicStream"
+Function PauseMusicStream(music As Music) = "pauseMusicStream"
+Function ResumeMusicStream(music As Music) = "resumeMusicStream"
+Function SeekMusicStream(music As Music, position As Float) = "seekMusicStream"
+Function SetMusicVolume(music As Music, volume As Float) = "setMusicVolume"
+Function SetMusicPitch(music As Music, pitch As Float) = "setMusicPitch"
+Function SetMusicPan(music As Music, pan As Float) = "setMusicPan"
+Function GetMusicTimeLength(music As Music) As Float = "getMusicTimeLength"
+Function GetMusicTimePlayed(music As Music) As Float = "getMusicTimePlayed"
+
+' ── Audio: AudioStream ─────────────────────────────────────────
+
+Function LoadAudioStream(sampleRate As Int, sampleSize As Int, channels As Int) As AudioStream = "loadAudioStream"
+Function IsAudioStreamReady(stream As AudioStream) As Bool = "isAudioStreamReady"
+Function UnloadAudioStream(stream As AudioStream) = "unloadAudioStream"
+Function IsAudioStreamProcessed(stream As AudioStream) As Bool = "isAudioStreamProcessed"
+Function PlayAudioStream(stream As AudioStream) = "playAudioStream"
+Function PauseAudioStream(stream As AudioStream) = "pauseAudioStream"
+Function ResumeAudioStream(stream As AudioStream) = "resumeAudioStream"
+Function IsAudioStreamPlaying(stream As AudioStream) As Bool = "isAudioStreamPlaying"
+Function StopAudioStream(stream As AudioStream) = "stopAudioStream"
+Function SetAudioStreamVolume(stream As AudioStream, volume As Float) = "setAudioStreamVolume"
+Function SetAudioStreamPitch(stream As AudioStream, pitch As Float) = "setAudioStreamPitch"
+Function SetAudioStreamPan(stream As AudioStream, pan As Float) = "setAudioStreamPan"
+
+' ── Color constant functions ───────────────────────────────────
+
+Function LIGHTGRAY() As Color = "lightgray"
+Function GRAY() As Color = "gray"
+Function DARKGRAY() As Color = "darkgray"
+Function YELLOW() As Color = "yellow"
+Function GOLD() As Color = "gold"
+Function ORANGE() As Color = "orange"
+Function PINK() As Color = "pink"
+Function RED() As Color = "red"
+Function MAROON() As Color = "maroon"
+Function GREEN() As Color = "green"
+Function LIME() As Color = "lime"
+Function DARKGREEN() As Color = "darkgreen"
+Function SKYBLUE() As Color = "skyblue"
+Function BLUE() As Color = "blue"
+Function DARKBLUE() As Color = "darkblue"
+Function PURPLE() As Color = "purple"
+Function VIOLET() As Color = "violet"
+Function DARKPURPLE() As Color = "darkpurple"
+Function BEIGE() As Color = "beige"
+Function BROWN() As Color = "brown"
+Function DARKBROWN() As Color = "darkbrown"
+Function WHITE() As Color = "white"
+Function BLACK() As Color = "black"
+Function BLANK() As Color = "blank"
+Function MAGENTA() As Color = "magenta"
+Function RAYWHITE() As Color = "raywhite"
+
+' ═══════════════════════════════════════════════════════════════════
+' Constants
+' ═══════════════════════════════════════════════════════════════════
+
+' ── Keyboard keys ──────────────────────────────────────────────
+
+Const KEY_NULL = 0
+Const KEY_APOSTROPHE = 39
+Const KEY_COMMA = 44
+Const KEY_MINUS = 45
+Const KEY_PERIOD = 46
+Const KEY_SLASH = 47
+Const KEY_ZERO = 48
+Const KEY_ONE = 49
+Const KEY_TWO = 50
+Const KEY_THREE = 51
+Const KEY_FOUR = 52
+Const KEY_FIVE = 53
+Const KEY_SIX = 54
+Const KEY_SEVEN = 55
+Const KEY_EIGHT = 56
+Const KEY_NINE = 57
+Const KEY_SEMICOLON = 59
+Const KEY_EQUAL = 61
+Const KEY_A = 65
+Const KEY_B = 66
+Const KEY_C = 67
+Const KEY_D = 68
+Const KEY_E = 69
+Const KEY_F = 70
+Const KEY_G = 71
+Const KEY_H = 72
+Const KEY_I = 73
+Const KEY_J = 74
+Const KEY_K = 75
+Const KEY_L = 76
+Const KEY_M = 77
+Const KEY_N = 78
+Const KEY_O = 79
+Const KEY_P = 80
+Const KEY_Q = 81
+Const KEY_R = 82
+Const KEY_S = 83
+Const KEY_T = 84
+Const KEY_U = 85
+Const KEY_V = 86
+Const KEY_W = 87
+Const KEY_X = 88
+Const KEY_Y = 89
+Const KEY_Z = 90
+Const KEY_LEFT_BRACKET = 91
+Const KEY_BACKSLASH = 92
+Const KEY_RIGHT_BRACKET = 93
+Const KEY_GRAVE = 96
+Const KEY_SPACE = 32
+Const KEY_ESCAPE = 256
+Const KEY_ENTER = 257
+Const KEY_TAB = 258
+Const KEY_BACKSPACE = 259
+Const KEY_INSERT = 260
+Const KEY_DELETE = 261
+Const KEY_RIGHT = 262
+Const KEY_LEFT = 263
+Const KEY_DOWN = 264
+Const KEY_UP = 265
+Const KEY_PAGE_UP = 266
+Const KEY_PAGE_DOWN = 267
+Const KEY_HOME = 268
+Const KEY_END = 269
+Const KEY_CAPS_LOCK = 280
+Const KEY_SCROLL_LOCK = 281
+Const KEY_NUM_LOCK = 282
+Const KEY_PRINT_SCREEN = 283
+Const KEY_PAUSE = 284
+Const KEY_F1 = 290
+Const KEY_F2 = 291
+Const KEY_F3 = 292
+Const KEY_F4 = 293
+Const KEY_F5 = 294
+Const KEY_F6 = 295
+Const KEY_F7 = 296
+Const KEY_F8 = 297
+Const KEY_F9 = 298
+Const KEY_F10 = 299
+Const KEY_F11 = 300
+Const KEY_F12 = 301
+Const KEY_LEFT_SHIFT = 340
+Const KEY_LEFT_CONTROL = 341
+Const KEY_LEFT_ALT = 342
+Const KEY_LEFT_SUPER = 343
+Const KEY_RIGHT_SHIFT = 344
+Const KEY_RIGHT_CONTROL = 345
+Const KEY_RIGHT_ALT = 346
+Const KEY_RIGHT_SUPER = 347
+Const KEY_KB_MENU = 348
+Const KEY_KP_0 = 320
+Const KEY_KP_1 = 321
+Const KEY_KP_2 = 322
+Const KEY_KP_3 = 323
+Const KEY_KP_4 = 324
+Const KEY_KP_5 = 325
+Const KEY_KP_6 = 326
+Const KEY_KP_7 = 327
+Const KEY_KP_8 = 328
+Const KEY_KP_9 = 329
+Const KEY_KP_DECIMAL = 330
+Const KEY_KP_DIVIDE = 331
+Const KEY_KP_MULTIPLY = 332
+Const KEY_KP_SUBTRACT = 333
+Const KEY_KP_ADD = 334
+Const KEY_KP_ENTER = 335
+Const KEY_KP_EQUAL = 336
+Const KEY_BACK = 4
+Const KEY_MENU = 82
+Const KEY_VOLUME_UP = 24
+Const KEY_VOLUME_DOWN = 25
+
+' ── Mouse buttons ──────────────────────────────────────────────
+
+Const MOUSE_BUTTON_LEFT = 0
+Const MOUSE_BUTTON_RIGHT = 1
+Const MOUSE_BUTTON_MIDDLE = 2
+Const MOUSE_BUTTON_SIDE = 3
+Const MOUSE_BUTTON_EXTRA = 4
+Const MOUSE_BUTTON_FORWARD = 5
+Const MOUSE_BUTTON_BACK = 6
+
+' ── Gamepad buttons ────────────────────────────────────────────
+
+Const GAMEPAD_BUTTON_UNKNOWN = 0
+Const GAMEPAD_BUTTON_LEFT_FACE_UP = 1
+Const GAMEPAD_BUTTON_LEFT_FACE_RIGHT = 2
+Const GAMEPAD_BUTTON_LEFT_FACE_DOWN = 3
+Const GAMEPAD_BUTTON_LEFT_FACE_LEFT = 4
+Const GAMEPAD_BUTTON_RIGHT_FACE_UP = 5
+Const GAMEPAD_BUTTON_RIGHT_FACE_RIGHT = 6
+Const GAMEPAD_BUTTON_RIGHT_FACE_DOWN = 7
+Const GAMEPAD_BUTTON_RIGHT_FACE_LEFT = 8
+Const GAMEPAD_BUTTON_LEFT_TRIGGER_1 = 9
+Const GAMEPAD_BUTTON_LEFT_TRIGGER_2 = 10
+Const GAMEPAD_BUTTON_RIGHT_TRIGGER_1 = 11
+Const GAMEPAD_BUTTON_RIGHT_TRIGGER_2 = 12
+Const GAMEPAD_BUTTON_MIDDLE_LEFT = 13
+Const GAMEPAD_BUTTON_MIDDLE = 14
+Const GAMEPAD_BUTTON_MIDDLE_RIGHT = 15
+Const GAMEPAD_BUTTON_LEFT_THUMB = 16
+Const GAMEPAD_BUTTON_RIGHT_THUMB = 17
+
+' ── Gamepad axes ───────────────────────────────────────────────
+
+Const GAMEPAD_AXIS_LEFT_X = 0
+Const GAMEPAD_AXIS_LEFT_Y = 1
+Const GAMEPAD_AXIS_RIGHT_X = 2
+Const GAMEPAD_AXIS_RIGHT_Y = 3
+Const GAMEPAD_AXIS_LEFT_TRIGGER = 4
+Const GAMEPAD_AXIS_RIGHT_TRIGGER = 5
+
+' ── Config flags ───────────────────────────────────────────────
+
+Const FLAG_VSYNC_HINT = 64
+Const FLAG_FULLSCREEN_MODE = 2
+Const FLAG_WINDOW_RESIZABLE = 4
+Const FLAG_WINDOW_UNDECORATED = 8
+Const FLAG_WINDOW_HIDDEN = 128
+Const FLAG_WINDOW_MINIMIZED = 512
+Const FLAG_WINDOW_MAXIMIZED = 1024
+Const FLAG_WINDOW_UNFOCUSED = 2048
+Const FLAG_WINDOW_TOPMOST = 4096
+Const FLAG_WINDOW_ALWAYS_RUN = 256
+Const FLAG_WINDOW_TRANSPARENT = 16
+Const FLAG_WINDOW_HIGHDPI = 8192
+Const FLAG_WINDOW_MOUSE_PASSTHROUGH = 16384
+Const FLAG_BORDERLESS_WINDOWED_MODE = 32768
+Const FLAG_MSAA_4X_HINT = 32
+Const FLAG_INTERLACED_HINT = 65536
+
+' ── Texture filter modes ───────────────────────────────────────
+
+Const TEXTURE_FILTER_POINT = 0
+Const TEXTURE_FILTER_BILINEAR = 1
+Const TEXTURE_FILTER_TRILINEAR = 2
+Const TEXTURE_FILTER_ANISOTROPIC_4X = 3
+Const TEXTURE_FILTER_ANISOTROPIC_8X = 4
+Const TEXTURE_FILTER_ANISOTROPIC_16X = 5
+
+' ── Texture wrap modes ─────────────────────────────────────────
+
+Const TEXTURE_WRAP_REPEAT = 0
+Const TEXTURE_WRAP_CLAMP = 1
+Const TEXTURE_WRAP_MIRROR_REPEAT = 2
+Const TEXTURE_WRAP_MIRROR_CLAMP = 3
+
+' ── Blend modes ────────────────────────────────────────────────
+
+Const BLEND_ALPHA = 0
+Const BLEND_ADDITIVE = 1
+Const BLEND_MULTIPLIED = 2
+Const BLEND_ADD_COLORS = 3
+Const BLEND_SUBTRACT_COLORS = 4
+Const BLEND_ALPHA_PREMULTIPLY = 5
+Const BLEND_CUSTOM = 6
+Const BLEND_CUSTOM_SEPARATE = 7
+
+' ── Camera modes ───────────────────────────────────────────────
+
+Const CAMERA_CUSTOM = 0
+Const CAMERA_FREE = 1
+Const CAMERA_ORBITAL = 2
+Const CAMERA_FIRST_PERSON = 3
+Const CAMERA_THIRD_PERSON = 4
+
+' ── Camera projection ──────────────────────────────────────────
+
+Const CAMERA_PERSPECTIVE = 0
+Const CAMERA_ORTHOGRAPHIC = 1
+
+' ── Gestures ───────────────────────────────────────────────────
+
+Const GESTURE_NONE = 0
+Const GESTURE_TAP = 1
+Const GESTURE_DOUBLETAP = 2
+Const GESTURE_HOLD = 4
+Const GESTURE_DRAG = 8
+Const GESTURE_SWIPE_RIGHT = 16
+Const GESTURE_SWIPE_LEFT = 32
+Const GESTURE_SWIPE_UP = 64
+Const GESTURE_SWIPE_DOWN = 128
+Const GESTURE_PINCH_IN = 256
+Const GESTURE_PINCH_OUT = 512
+
+' ── Mouse cursors ──────────────────────────────────────────────
+
+Const MOUSE_CURSOR_DEFAULT = 0
+Const MOUSE_CURSOR_ARROW = 1
+Const MOUSE_CURSOR_IBEAM = 2
+Const MOUSE_CURSOR_CROSSHAIR = 3
+Const MOUSE_CURSOR_POINTING_HAND = 4
+Const MOUSE_CURSOR_RESIZE_EW = 5
+Const MOUSE_CURSOR_RESIZE_NS = 6
+Const MOUSE_CURSOR_RESIZE_NWSE = 7
+Const MOUSE_CURSOR_RESIZE_NESW = 8
+Const MOUSE_CURSOR_RESIZE_ALL = 9
+Const MOUSE_CURSOR_NOT_ALLOWED = 10
+
+' ── Pixel formats ──────────────────────────────────────────────
+
+Const PIXELFORMAT_UNCOMPRESSED_GRAYSCALE = 1
+Const PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA = 2
+Const PIXELFORMAT_UNCOMPRESSED_R5G6B5 = 3
+Const PIXELFORMAT_UNCOMPRESSED_R8G8B8 = 4
+Const PIXELFORMAT_UNCOMPRESSED_R5G5B5A1 = 5
+Const PIXELFORMAT_UNCOMPRESSED_R4G4B4A4 = 6
+Const PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 = 7
+Const PIXELFORMAT_UNCOMPRESSED_R32 = 8
+Const PIXELFORMAT_UNCOMPRESSED_R32G32B32 = 9
+Const PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 = 10
+Const PIXELFORMAT_UNCOMPRESSED_R16 = 11
+Const PIXELFORMAT_UNCOMPRESSED_R16G16B16 = 12
+Const PIXELFORMAT_UNCOMPRESSED_R16G16B16A16 = 13
+Const PIXELFORMAT_COMPRESSED_DXT1_RGB = 14
+Const PIXELFORMAT_COMPRESSED_DXT1_RGBA = 15
+Const PIXELFORMAT_COMPRESSED_DXT3_RGBA = 16
+Const PIXELFORMAT_COMPRESSED_DXT5_RGBA = 17
+Const PIXELFORMAT_COMPRESSED_ETC1_RGB = 18
+Const PIXELFORMAT_COMPRESSED_ETC2_RGB = 19
+Const PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA = 20
+Const PIXELFORMAT_COMPRESSED_PVRT_RGB = 21
+Const PIXELFORMAT_COMPRESSED_PVRT_RGBA = 22
+Const PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA = 23
+Const PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA = 24
+
+' ── Log levels ─────────────────────────────────────────────────
+
+Const LOG_ALL = 0
+Const LOG_TRACE = 1
+Const LOG_DEBUG = 2
+Const LOG_INFO = 3
+Const LOG_WARNING = 4
+Const LOG_ERROR = 5
+Const LOG_FATAL = 6
+Const LOG_NONE = 7
+
+' ── Material map index ─────────────────────────────────────────
+
+Const MATERIAL_MAP_ALBEDO = 0
+Const MATERIAL_MAP_METALNESS = 1
+Const MATERIAL_MAP_NORMAL = 2
+Const MATERIAL_MAP_ROUGHNESS = 3
+Const MATERIAL_MAP_OCCLUSION = 4
+Const MATERIAL_MAP_EMISSION = 5
+Const MATERIAL_MAP_HEIGHT = 6
+Const MATERIAL_MAP_CUBEMAP = 7
+Const MATERIAL_MAP_IRRADIANCE = 8
+Const MATERIAL_MAP_PREFILTER = 9
+Const MATERIAL_MAP_BRDF = 10
+
+' ── N-Patch layout ─────────────────────────────────────────────
+
+Const NPATCH_NINE_PATCH = 0
+Const NPATCH_THREE_PATCH_VERTICAL = 1
+Const NPATCH_THREE_PATCH_HORIZONTAL = 2

@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { lex } from "./lexer/index.js";
 import { parse, Program, Stmt } from "./parser/index.js";
-import { check, CheckerEnv, FuncSymbol, VarSymbol } from "./checker/index.js";
+import { check, CheckerEnv, FuncSymbol, VarSymbol, TypeDeclSymbol } from "./checker/index.js";
 import { generate } from "./codegen/index.js";
 import { resolveModule } from "./modules/index.js";
 import { NeoBasicError } from "./errors.js";
@@ -57,15 +57,19 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
 
   // 3. Resolve modules
   const moduleContents = new Map<string, string>();
+  const asyncModules = new Set<string>();
   const env: Partial<CheckerEnv> = {
     funcs: new Map<string, FuncSymbol>(),
     vars: new Map<string, VarSymbol>(),
+    types: new Map<string, TypeDeclSymbol>(),
   };
 
   for (const stmt of importStmts) {
     if (stmt.kind === "ImportStmt") {
       const moduleDef = resolveModule(stmt.moduleName, cwd);
       moduleContents.set(moduleDef.name, fs.readFileSync(moduleDef.jsPath, "utf-8"));
+
+      if (moduleDef.async) asyncModules.add(moduleDef.name);
 
       // Register module functions
       for (const [name, func] of moduleDef.funcs) {
@@ -76,6 +80,11 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
       for (const [name, constDef] of moduleDef.consts) {
         env.vars!.set(name, { type: constDef.type, isConst: true });
       }
+
+      // Register module types
+      for (const [name, typeDef] of moduleDef.types) {
+        env.types!.set(name, typeDef);
+      }
     }
   }
 
@@ -84,7 +93,9 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   const checkResult = check(program, absPath, env);
 
   // 5. Generate JS
-  const js = generate(program, checkResult, { moduleContents });
+  const hasAsync = asyncModules.size > 0;
+  const moduleTypes = env.types!.size > 0 ? env.types! : undefined;
+  const js = generate(program, checkResult, { moduleContents, asyncModules, async: hasAsync, moduleTypes });
 
   return { js, env: checkResult.env };
 }

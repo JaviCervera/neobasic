@@ -1,0 +1,12 @@
+Import "typedmod"
+
+v As Vec2 = MakeVec(1.0, 2.0)
+w As Vec2 = MakeVec(3.0, 4.0)
+sum As Vec2 = AddVecs(v, w)
+result = VecToStr(sum)
+
+c As Color = New Color
+c.R = 255
+c.G = 128
+c.B = 0
+colorR = c.R

@@ -400,15 +400,22 @@ Modules let you call JavaScript functions from NeoBasic. A module consists of tw
 
 #### Module declaration (`.nbm`)
 
-Declare the NeoBasic signatures for your JavaScript functions:
+Declare the NeoBasic signatures for your JavaScript functions, types, and constants:
 
 ```basic
 'File: ext.nbm
 Function Foo(a As String) = "foo"
 Const VERSION = "1.0"
+
+Type MyVec
+  X As Float
+  Y As Float
+EndType
 ```
 
 The string after `=` maps the NeoBasic name to the JavaScript function name.
+
+Modules that require asynchronous initialisation (e.g. WASM) can declare `Async` at the top of the `.nbm` file. The compiled output will be wrapped in an async IIFE and the module loaded with `await`.
 
 #### Module implementation (`.js`)
 
@@ -464,6 +471,51 @@ Print("Enter a number:")
 n = Val("42")
 Print("Double: " + Str(n * 2))
 ```
+
+### Raylib module
+
+NeoBasic includes a `raylib` module that provides bindings to the [Raylib](https://www.raylib.com/) game development library via WebAssembly. Import it with `Import "raylib"`.
+
+The module exposes **27 types**, **383 functions**, and **250 constants** covering the full Raylib API:
+
+| Category | Examples |
+|---|---|
+| Window management | `InitWindow`, `CloseWindow`, `WindowShouldClose`, `SetTargetFPS` |
+| Drawing | `ClearBackground`, `BeginDrawing`, `EndDrawing` |
+| Shapes | `DrawCircle`, `DrawRectangle`, `DrawLine`, `DrawTriangle`, `DrawPoly` |
+| Input | `IsKeyPressed`, `IsMouseButtonDown`, `GetMousePosition` |
+| Textures | `LoadTexture`, `DrawTexture`, `UnloadTexture` |
+| Text / Fonts | `DrawText`, `LoadFont`, `MeasureText` |
+| 3D | `DrawCube`, `DrawSphere`, `LoadModel`, `DrawGrid` |
+| Audio | `LoadSound`, `PlaySound`, `LoadMusicStream` |
+| Collision | `CheckCollisionRecs`, `CheckCollisionCircles`, `GetRayCollisionMesh` |
+
+**Types** like `Color`, `Vector2`, `Vector3`, `Rectangle`, and `Camera2D` are mapped as NeoBasic UDTs — create them with `New` and access their fields directly.
+
+**Predefined colors** are available as zero-argument functions: `RED()`, `GREEN()`, `BLUE()`, `WHITE()`, `BLACK()`, `RAYWHITE()`, etc.
+
+**Keyboard/mouse/gamepad constants** are available directly: `KEY_A`, `KEY_SPACE`, `KEY_ESCAPE`, `MOUSE_BUTTON_LEFT`, etc.
+
+Example:
+
+```basic
+Import "raylib"
+
+InitWindow(800, 450, "NeoBasic — Raylib Example")
+SetTargetFPS(60)
+
+While Not WindowShouldClose()
+  BeginDrawing()
+  ClearBackground(RAYWHITE())
+  DrawText("Hello from NeoBasic!", 190, 200, 20, DARKGRAY())
+  DrawCircle(400, 300, 50.0, RED())
+  EndDrawing()
+EndWhile
+
+CloseWindow()
+```
+
+> **Note:** The raylib module requires the WASM binary to be built from source using emscripten. See `neo_mods/raylib/build/` for instructions. The committed `raylib.js` currently contains stub wrappers — run the build script to produce the full WASM-backed implementation.
 
 ## License
 

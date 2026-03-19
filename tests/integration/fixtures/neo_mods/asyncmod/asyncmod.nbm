@@ -1,0 +1,3 @@
+Async
+
+Function AsyncDouble(n As Int) As Int = "asyncdouble"

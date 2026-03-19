@@ -247,6 +247,32 @@ describe("Code Generator", () => {
       const fn = new Function(output);
       expect(() => fn()).not.toThrow();
     });
+    it("wraps output in async IIFE when async option is set", () => {
+      const funcs = new Map<string, FuncSymbol>([["print", coreFunc]]);
+      const tokens = lex('Print("hi")', undefined);
+      const ast = parse(tokens);
+      const result = check(ast, "<test>", { funcs });
+      const output = generate(ast, result, {
+        moduleContents: new Map([["raylib", 'module.exports = { init: async function() {} };']]),
+        asyncModules: new Set(["raylib"]),
+        async: true,
+      });
+      expect(output).toContain("(async () => {");
+      expect(output).toContain("await (async () => {");
+      expect(output).toMatch(/\}\)\(\);\s*$/); // ends with })();
+    });
+
+    it("does not use async IIFE when async option is false", () => {
+      const funcs = new Map<string, FuncSymbol>([["print", coreFunc]]);
+      const tokens = lex('Print("hi")', undefined);
+      const ast = parse(tokens);
+      const result = check(ast, "<test>", { funcs });
+      const output = generate(ast, result, {
+        moduleContents: new Map([["core", 'module.exports = { print: function(m) {} };']]),
+      });
+      expect(output).not.toContain("(async () => {");
+      expect(output).not.toContain("await");
+    });
   });
 
   describe("variable scoping", () => {

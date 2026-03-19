@@ -1,0 +1,3 @@
+Import "asyncmod"
+
+result = AsyncDouble(21)

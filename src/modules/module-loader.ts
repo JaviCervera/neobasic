@@ -4,14 +4,16 @@ import * as os from "node:os";
 import { lex } from "../lexer/index.js";
 import { Token, TokenKind } from "../lexer/tokens.js";
 import { ModuleError } from "../errors.js";
-import { FuncSymbol } from "../checker/checker.js";
+import { FuncSymbol, TypeDeclSymbol } from "../checker/checker.js";
 import { NbType, INT, FLOAT, STRING, BOOL, VOID, arrayOf, udtOf } from "../checker/types.js";
 
 export interface ModuleDefinition {
   name: string;
   jsPath: string;
+  async: boolean;
   funcs: Map<string, FuncSymbol>;
   consts: Map<string, { type: NbType; value: string }>;
+  types: Map<string, TypeDeclSymbol>;
 }
 
 /**
@@ -62,6 +64,8 @@ function parseModuleFile(
   const tokens = lex(source, nbmPath);
   const funcs = new Map<string, FuncSymbol>();
   const consts = new Map<string, { type: NbType; value: string }>();
+  const types = new Map<string, TypeDeclSymbol>();
+  let isAsync = false;
 
   let pos = 0;
 
@@ -108,6 +112,14 @@ function parseModuleFile(
   }
 
   skipNewlines();
+
+  // Check for @async directive (identifier "async" prefixed by nothing — lexed as Identifier)
+  if (at(TokenKind.Identifier) && current().value.toLowerCase() === "async") {
+    advance();
+    isAsync = true;
+    skipNewlines();
+  }
+
   while (!at(TokenKind.EOF)) {
     if (at(TokenKind.Function)) {
       advance();
@@ -167,6 +179,23 @@ function parseModuleFile(
           throw new ModuleError(`Unexpected token in Const value: ${valueTok.value}`, nbmPath, valueTok.line, valueTok.col);
       }
       consts.set(name.toLowerCase(), { type, value });
+    } else if (at(TokenKind.Type)) {
+      const typeTok = advance();
+      const typeName = expect(TokenKind.Identifier, "Expected type name").value;
+      skipNewlines();
+      const fields: { name: string; type: NbType }[] = [];
+      while (!at(TokenKind.EndType) && !at(TokenKind.EOF)) {
+        const fieldName = expect(TokenKind.Identifier, "Expected field name").value;
+        expect(TokenKind.As, "Expected 'As' after field name");
+        const fieldType = resolveType();
+        fields.push({ name: fieldName.toLowerCase(), type: fieldType });
+        skipNewlines();
+      }
+      if (!at(TokenKind.EndType)) {
+        throw new ModuleError("Expected 'EndType'", nbmPath, typeTok.line, typeTok.col);
+      }
+      advance(); // consume EndType
+      types.set(typeName.toLowerCase(), { fields });
     } else {
       throw new ModuleError(
         `Unexpected token in module file: '${current().value}'`,
@@ -177,5 +206,5 @@ function parseModuleFile(
     skipNewlines();
   }
 
-  return { name: moduleName, jsPath, funcs, consts };
+  return { name: moduleName, jsPath, async: isAsync, funcs, consts, types };
 }
