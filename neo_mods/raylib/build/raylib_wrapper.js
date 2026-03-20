@@ -60,7 +60,9 @@ function _requireBrowser(fn) {
 
 function initWindow(w, h, title)  { _requireBrowser('InitWindow'); _withStr(title, p => M._bridge_InitWindow(w, h, p)); }
 function closeWindow()            { M._bridge_CloseWindow(); }
-function windowShouldClose()      { return !!M._bridge_WindowShouldClose(); }
+async function windowShouldClose() {
+  return !!(await M.ccall('bridge_WindowShouldClose', 'number', [], [], { async: true }));
+}
 function isWindowReady()          { return !!M._bridge_IsWindowReady(); }
 function isWindowFullscreen()     { return !!M._bridge_IsWindowFullscreen(); }
 function isWindowHidden()         { return !!M._bridge_IsWindowHidden(); }
@@ -112,10 +114,7 @@ function isCursorOnScreen() { return !!M._bridge_IsCursorOnScreen(); }
 // ── Drawing control ───────────────────────────────────────────────
 function clearBackground(c) { M._bridge_ClearBackground(..._c(c)); }
 function beginDrawing()     { M._bridge_BeginDrawing(); }
-async function endDrawing() {
-  M._bridge_EndDrawing();
-  await new Promise(r => (typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : setTimeout)(r));
-}
+function endDrawing()       { M._bridge_EndDrawing(); }
 function beginMode2D(cam)   { M._bridge_BeginMode2D(cam.offsetx, cam.offsety, cam.targetx, cam.targety, cam.rotation, cam.zoom); }
 function endMode2D()        { M._bridge_EndMode2D(); }
 function beginMode3D(cam)   { M._bridge_BeginMode3D(cam.posx, cam.posy, cam.posz, cam.targetx, cam.targety, cam.targetz, cam.upx, cam.upy, cam.upz, cam.fovy, cam.projection); }
