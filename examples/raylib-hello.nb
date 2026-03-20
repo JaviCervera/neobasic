@@ -3,17 +3,17 @@ Import "raylib"
 InitWindow(800, 450, "NeoBasic — Raylib Example")
 SetTargetFPS(60)
 
-x As Float = 400.0
-speed As Float = 200.0
+x = 400.0
+speed = 200.0
 
 While Not WindowShouldClose()
-  dt As Float = GetFrameTime()
+  dt = GetFrameTime()
   x = x + speed * dt
   If x > 750.0 Or x < 50.0
     speed = speed * -1.0
   EndIf
 
-  pos As Vector2 = New Vector2
+  pos = New Vector2
   pos.X = x
   pos.Y = 300.0
 

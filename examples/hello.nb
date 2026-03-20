@@ -13,7 +13,7 @@ result = Factorial(10)
 Print("10! = " + Str(result))
 
 ' Float with StrF()
-pi As Float = 3.14159
+pi = 3.14159
 Print("Pi: " + StrF(pi))
 
 ' String to number with Val()
