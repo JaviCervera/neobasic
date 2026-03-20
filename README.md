@@ -452,7 +452,7 @@ Foo("hello from NeoBasic!")
 
 ### Core module
 
-NeoBasic ships with a bundled `core` module that provides essential I/O and type-conversion functions. Import it with `Import "core"`.
+NeoBasic ships with a bundled `core` module that is **automatically imported** into every program — no `Import` statement is needed. It provides essential I/O and type-conversion functions:
 
 | Function | Signature | Description |
 |---|---|---|
@@ -465,8 +465,6 @@ NeoBasic ships with a bundled `core` module that provides essential I/O and type
 Example:
 
 ```basic
-Import "core"
-
 Print("Enter a number:")
 n = Val("42")
 Print("Double: " + Str(n * 2))

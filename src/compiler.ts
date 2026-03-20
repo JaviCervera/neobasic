@@ -64,8 +64,16 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
     types: new Map<string, TypeDeclSymbol>(),
   };
 
+  // Always load core module implicitly
+  const coreModule = resolveModule("core", cwd);
+  moduleContents.set(coreModule.name, fs.readFileSync(coreModule.jsPath, "utf-8"));
+  for (const [name, func] of coreModule.funcs) env.funcs!.set(name, func);
+  for (const [name, constDef] of coreModule.consts) env.vars!.set(name, { type: constDef.type, isConst: true });
+  for (const [name, typeDef] of coreModule.types) env.types!.set(name, typeDef);
+
   for (const stmt of importStmts) {
     if (stmt.kind === "ImportStmt") {
+      if (stmt.moduleName === "core") continue; // already loaded implicitly
       const moduleDef = resolveModule(stmt.moduleName, cwd);
       moduleContents.set(moduleDef.name, fs.readFileSync(moduleDef.jsPath, "utf-8"));
 
