@@ -11,7 +11,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Integer division | `Int / Int` truncates to `Int` |
 | `=` vs `==` | `=` is always assignment; `==` is always equality |
 | Variable scoping | Function-scoped |
-| Standard library | A bundled `core` module provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
+| Standard library | A bundled `core` module (auto-imported) provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
 
@@ -260,11 +260,13 @@ Create `neo_mods/raylib/build/` containing:
    - Memory management helpers (malloc/free via emscripten exports)
    - C bridge functions that flatten struct arguments for WASM interop
    - JS wrapper functions mapping NeoBasic names to WASM bridge calls
-2. **`raylib_bridge.c`** — C bridge layer (~247 functions) that flattens all struct-by-value arguments to scalars, uses a handle table for opaque types (Image, Texture, Font, etc.), and calls `emscripten_sleep(0)` in EndDrawing for browser event loop yielding.
+2. **`raylib_bridge.c`** — C bridge layer (~247 functions) that flattens all struct-by-value arguments to scalars, uses a handle table for opaque types (Image, Texture, Font, etc.).
 3. **`raylib_wrapper.js`** — JS wrappers mapping all ~383 NeoBasic function names to WASM bridge calls, with struct marshaling helpers.
 4. **`exported_functions.txt`** — list of all bridge function symbols for emscripten linker.
 
-**Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web --no-entry -Os`
+**Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web,node --no-entry -Os`
+
+**ASYNCIFY note:** Raylib's web platform calls `emscripten_sleep(16)` inside `WindowShouldClose()` for frame pacing. The JS wrapper uses `M.ccall('bridge_WindowShouldClose', ..., {async: true})` to properly handle ASYNCIFY suspension/resumption. The codegen emits `await` for all async module function calls.
 
 **Prerequisites:** Emscripten SDK. Only needed when rebuilding; the committed `raylib.js` (~940 KB) includes the embedded WASM so end users don't need emscripten.
 
@@ -422,7 +424,7 @@ Located at `neo_mods/core/`. Provides essential I/O and conversion functions:
 | `Val` | `(s As String) As Int` | Parse String to Int |
 | `ValF` | `(s As String) As Float` | Parse String to Float |
 
-Usage: `Import "core"` at the top of a `.nb` file.
+Usage: Automatically imported — no `Import` statement needed.
 
 ### `raylib`
 
