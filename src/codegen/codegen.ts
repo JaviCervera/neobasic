@@ -37,6 +37,8 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
     return name.toLowerCase();
   }
 
+  const asyncModuleSet = options?.asyncModules ?? new Set<string>();
+
   // ── Async wrapper (if needed) ────────────────────────────────
 
   const needsAsync = options?.async ?? false;
@@ -382,9 +384,14 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
         const func = env.funcs.get(callee);
         // If it's an external module function, use the module prefix
         if (func?.isExternal && func.externalName) {
-          // Find which module this function belongs to
           const args = expr.args.map(a => emitExpr(a)).join(", ");
-          return `${func.externalName}(${args})`;
+          const call = `${func.externalName}(${args})`;
+          // Await calls to functions from async modules
+          const moduleName = func.externalName.split(".")[0];
+          if (needsAsync && asyncModuleSet.has(moduleName)) {
+            return `await ${call}`;
+          }
+          return call;
         }
         const args = expr.args.map(a => emitExpr(a)).join(", ");
         return `${callee}(${args})`;

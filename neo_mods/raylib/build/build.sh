@@ -67,7 +67,7 @@ emcc "$BRIDGE_C" "$RAYLIB_A" \
   -sASYNCIFY_STACK_SIZE=65536 \
   -sEXPORTED_RUNTIME_METHODS='["cwrap","ccall","UTF8ToString","stringToUTF8","stringToNewUTF8"]' \
   -sEXPORTED_FUNCTIONS="$(cat "$SCRIPT_DIR/exported_functions.txt")" \
-  -sENVIRONMENT=web \
+  -sENVIRONMENT=web,node \
   --no-entry
 
 echo "  Done."

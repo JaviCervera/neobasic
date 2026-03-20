@@ -2,7 +2,10 @@
 // NeoBasic Raylib Wrappers — glues emscripten WASM to module.exports
 // ═══════════════════════════════════════════════════════════════════
 
-const M = await createRaylib();
+const _isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+
+const _moduleOpts = _isBrowser ? { canvas: document.getElementById('canvas') } : {};
+const M = await createRaylib(_moduleOpts);
 
 // Helper: read Vector2 from float pointer
 function _v2(ptr) { return { x: M.HEAPF32[ptr >> 2], y: M.HEAPF32[(ptr >> 2) + 1] }; }
@@ -51,7 +54,11 @@ function magenta()    { return { r: 255, g: 0,   b: 255, a: 255 }; }
 function raywhite()   { return { r: 245, g: 245, b: 245, a: 255 }; }
 
 // ── Window management ─────────────────────────────────────────────
-function initWindow(w, h, title)  { _withStr(title, p => M._bridge_InitWindow(w, h, p)); }
+function _requireBrowser(fn) {
+  if (!_isBrowser) throw new Error(`raylib: ${fn}() requires a browser environment (WebGL). Run the compiled .js in an HTML page.`);
+}
+
+function initWindow(w, h, title)  { _requireBrowser('InitWindow'); _withStr(title, p => M._bridge_InitWindow(w, h, p)); }
 function closeWindow()            { M._bridge_CloseWindow(); }
 function windowShouldClose()      { return !!M._bridge_WindowShouldClose(); }
 function isWindowReady()          { return !!M._bridge_IsWindowReady(); }
@@ -105,7 +112,10 @@ function isCursorOnScreen() { return !!M._bridge_IsCursorOnScreen(); }
 // ── Drawing control ───────────────────────────────────────────────
 function clearBackground(c) { M._bridge_ClearBackground(..._c(c)); }
 function beginDrawing()     { M._bridge_BeginDrawing(); }
-function endDrawing()       { M._bridge_EndDrawing(); }
+async function endDrawing() {
+  M._bridge_EndDrawing();
+  await new Promise(r => (typeof requestAnimationFrame !== 'undefined' ? requestAnimationFrame : setTimeout)(r));
+}
 function beginMode2D(cam)   { M._bridge_BeginMode2D(cam.offsetx, cam.offsety, cam.targetx, cam.targety, cam.rotation, cam.zoom); }
 function endMode2D()        { M._bridge_EndMode2D(); }
 function beginMode3D(cam)   { M._bridge_BeginMode3D(cam.posx, cam.posy, cam.posz, cam.targetx, cam.targety, cam.targetz, cam.upx, cam.upy, cam.upz, cam.fovy, cam.projection); }

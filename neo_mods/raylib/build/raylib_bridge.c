@@ -143,7 +143,6 @@ EMSCRIPTEN_KEEPALIVE void bridge_BeginDrawing(void) { BeginDrawing(); }
 
 EMSCRIPTEN_KEEPALIVE void bridge_EndDrawing(void) {
     EndDrawing();
-    emscripten_sleep(0); // yield to browser event loop
 }
 
 EMSCRIPTEN_KEEPALIVE void bridge_BeginMode2D(float ox, float oy, float tx, float ty, float rot, float zoom) {
