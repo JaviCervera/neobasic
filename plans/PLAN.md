@@ -251,22 +251,24 @@ When a module requires async initialisation (WASM loading), the compiled output 
 })();
 ```
 
-#### 9.3 — WASM Build Pipeline
+#### 9.3 — WASM Build Pipeline ✅
 
 Create `neo_mods/raylib/build/` containing:
 
 1. **`build.sh`** — compiles raylib with emscripten, base64-encodes the `.wasm`, and assembles the final `raylib.js` by combining:
-   - Base64 WASM string constant
-   - WASM instantiation code (decode → compile → instantiate)
-   - Memory management helpers (malloc/free wrappers, stack allocator)
-   - Struct layout definitions and marshaling functions
-   - Function wrappers for every exported raylib function
-2. **`struct-layouts.json`** — auto-generated C struct field offsets and sizes (used by marshaling code).
-3. A copy of the raylib source or a script to download a pinned release.
+   - Emscripten glue code (MODULARIZE + SINGLE_FILE, WASM embedded as base64)
+   - Memory management helpers (malloc/free via emscripten exports)
+   - C bridge functions that flatten struct arguments for WASM interop
+   - JS wrapper functions mapping NeoBasic names to WASM bridge calls
+2. **`raylib_bridge.c`** — C bridge layer (~247 functions) that flattens all struct-by-value arguments to scalars, uses a handle table for opaque types (Image, Texture, Font, etc.), and calls `emscripten_sleep(0)` in EndDrawing for browser event loop yielding.
+3. **`raylib_wrapper.js`** — JS wrappers mapping all ~383 NeoBasic function names to WASM bridge calls, with struct marshaling helpers.
+4. **`exported_functions.txt`** — list of all bridge function symbols for emscripten linker.
 
-**Prerequisites:** Emscripten SDK. Only needed when rebuilding; the committed `raylib.js` includes the embedded WASM so end users don't need emscripten.
+**Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web --no-entry -Os`
 
-#### 9.4 — Struct Marshaling
+**Prerequisites:** Emscripten SDK. Only needed when rebuilding; the committed `raylib.js` (~940 KB) includes the embedded WASM so end users don't need emscripten.
+
+#### 9.4 — Struct Marshaling ✅
 
 Two categories of types live in `raylib.js`:
 

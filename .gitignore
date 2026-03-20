@@ -142,3 +142,7 @@ vite.config.ts.timestamp-*
 examples/*.js
 
 .DS_Store
+
+# Raylib WASM build artifacts
+neo_mods/raylib/build/raylib-*/
+neo_mods/raylib/build/output/

@@ -515,7 +515,13 @@ EndWhile
 CloseWindow()
 ```
 
-> **Note:** The raylib module requires the WASM binary to be built from source using emscripten. See `neo_mods/raylib/build/` for instructions. The committed `raylib.js` currently contains stub wrappers — run the build script to produce the full WASM-backed implementation.
+> **Note:** The committed `raylib.js` includes the full WASM-backed implementation (pre-built, ~940 KB). To rebuild it from source (e.g. after modifying the C bridge or upgrading raylib), you need [Emscripten](https://emscripten.org/) installed, then run:
+>
+> ```bash
+> cd neo_mods/raylib/build && bash build.sh
+> ```
+>
+> This downloads raylib 5.0 source, compiles it to WebAssembly, and assembles the final `raylib.js`.
 
 ## License
 
