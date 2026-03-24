@@ -479,6 +479,9 @@ export function check(
           err("Return statement outside of function", stmt.line, stmt.col);
         }
         if (stmt.value) {
+          if (currentFuncReturnType.kind === "Void") {
+            err("A function with no return type cannot return a value", stmt.line, stmt.col);
+          }
           const retType = checkExpr(stmt.value);
           if (!isAssignable(retType, currentFuncReturnType)) {
             err(
