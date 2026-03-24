@@ -19,6 +19,8 @@ export interface FuncSymbol {
   returnType: NbType;
   isExternal: boolean;
   externalName?: string;
+  /** True when the function returns a Promise and call sites must use await. */
+  isAsync?: boolean;
 }
 
 export interface TypeDeclSymbol {

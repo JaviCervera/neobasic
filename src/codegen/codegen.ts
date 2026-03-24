@@ -386,9 +386,7 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
         if (func?.isExternal && func.externalName) {
           const args = expr.args.map(a => emitExpr(a)).join(", ");
           const call = `${func.externalName}(${args})`;
-          // Await calls to functions from async modules
-          const moduleName = func.externalName.split(".")[0];
-          if (needsAsync && asyncModuleSet.has(moduleName)) {
+          if (needsAsync && func.isAsync) {
             return `await ${call}`;
           }
           return call;

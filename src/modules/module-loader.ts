@@ -113,14 +113,27 @@ function parseModuleFile(
 
   skipNewlines();
 
-  // Check for @async directive (identifier "async" prefixed by nothing — lexed as Identifier)
+  // Module-level Async flag: a bare "Async" on its own line (not followed by Function).
+  // Controls whether the module's IIFE initialiser is async (e.g. WASM loading).
   if (at(TokenKind.Identifier) && current().value.toLowerCase() === "async") {
-    advance();
-    isAsync = true;
-    skipNewlines();
+    const nextKind = pos + 1 < tokens.length ? tokens[pos + 1].kind : TokenKind.EOF;
+    if (nextKind !== TokenKind.Function) {
+      advance();
+      isAsync = true;
+      skipNewlines();
+    }
   }
 
   while (!at(TokenKind.EOF)) {
+    // Optional per-function Async keyword: "Async Function Foo(...)"
+    let funcIsAsync = false;
+    if (at(TokenKind.Identifier) && current().value.toLowerCase() === "async") {
+      if (pos + 1 < tokens.length && tokens[pos + 1].kind === TokenKind.Function) {
+        advance(); // consume 'Async'
+        funcIsAsync = true;
+      }
+    }
+
     if (at(TokenKind.Function)) {
       advance();
       const name = expect(TokenKind.Identifier, "Expected function name").value;
@@ -161,6 +174,7 @@ function parseModuleFile(
         returnType,
         isExternal: true,
         externalName: `${moduleName}.${externalName}`,
+        isAsync: funcIsAsync,
       });
     } else if (at(TokenKind.Const)) {
       advance();
@@ -197,6 +211,12 @@ function parseModuleFile(
       advance(); // consume EndType
       types.set(typeName.toLowerCase(), { fields });
     } else {
+      if (funcIsAsync) {
+        throw new ModuleError(
+          `Expected 'Function' after 'Async'`,
+          nbmPath, current().line, current().col,
+        );
+      }
       throw new ModuleError(
         `Unexpected token in module file: '${current().value}'`,
         nbmPath, current().line, current().col,

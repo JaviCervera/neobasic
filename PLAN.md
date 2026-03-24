@@ -225,12 +225,19 @@ EndType
 When a module requires async initialisation (WASM loading), the compiled output must use `await`.
 
 **Approach:**
-- Add an `@async` directive recognised at the top of `.nbm` files (before any Function/Type/Const).
-- In `compiler.ts`, track whether any imported module is async.
-- In `codegen.ts`:
-  - If any module is async, wrap the entire output in `(async () => { … })();`
-  - Emit async module IIFEs: `const raylib = await (async () => { … })();`
-  - Non-async modules (like `core`) remain synchronous IIFEs inside the async wrapper.
+- A bare `Async` line at the top of a `.nbm` file marks the module's initialiser as async (WASM, etc.). The compiler emits `const mod = await (async () => { … })();` for that module and wraps the whole output in an async IIFE.
+- Individual functions that return a `Promise` are declared with `Async Function` in the `.nbm` file. The codegen emits `await` only for those specific call sites — other functions in the same module are called synchronously.
+- `compiler.ts` sets `hasAsync` when either condition is true: any module has an async initialiser, or any registered function has `isAsync: true`.
+
+**Example `.nbm` declaration:**
+```
+' Module-level async: WASM needs async init
+Async
+
+' Only this function is awaited at call sites
+Async Function WindowShouldClose() As Bool = "windowShouldClose"
+Function BeginDrawing() = "beginDrawing"
+```
 
 **Example compiled output:**
 ```js
@@ -248,6 +255,10 @@ When a module requires async initialisation (WASM loading), the compiled output 
   })();
 
   // … user code …
+  while (!await raylib.windowShouldClose()) {   // awaited — declared Async Function
+    raylib.beginDrawing();                       // not awaited — plain Function
+    // …
+  }
 })();
 ```
 
@@ -266,7 +277,7 @@ Create `neo_mods/raylib/build/` containing:
 
 **Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web,node --no-entry -Os`
 
-**ASYNCIFY note:** Raylib's web platform calls `emscripten_sleep(16)` inside `WindowShouldClose()` for frame pacing. The JS wrapper uses `M.ccall('bridge_WindowShouldClose', ..., {async: true})` to properly handle ASYNCIFY suspension/resumption. The codegen emits `await` for all async module function calls.
+**ASYNCIFY note:** Raylib's web platform calls `emscripten_sleep(16)` inside `WindowShouldClose()` for frame pacing. The JS wrapper uses `M.ccall('bridge_WindowShouldClose', ..., {async: true})` to properly handle ASYNCIFY suspension/resumption. `WindowShouldClose` is declared `Async Function` in `raylib.nbm` so only that call site is awaited; the hundreds of other Raylib calls are emitted without `await`, avoiding unnecessary microtask overhead.
 
 **Prerequisites:** Emscripten SDK. Only needed when rebuilding; the committed `raylib.js` (~940 KB) includes the embedded WASM so end users don't need emscripten.
 

@@ -144,15 +144,19 @@ describe("Integration Tests", () => {
   describe("async modules", () => {
     const asyncFixture = path.join(FIXTURES, "async-module.nb");
 
-    it("wraps output in async IIFE when module is async", () => {
+    it("wraps output in async IIFE when any function is async", () => {
       const result = compile(asyncFixture);
       expect(result.js).toContain("(async () => {");
-      expect(result.js).toContain("await (async () => {");
       expect(result.js).toContain("})();");
     });
 
-    it("non-async modules remain synchronous even inside async wrapper", () => {
-      // Compile a file that uses both core (sync) and asyncmod (async)
+    it("awaits calls to individually-async functions", () => {
+      const result = compile(asyncFixture);
+      expect(result.js).toContain("await asyncmod.asyncdouble(21)");
+    });
+
+    it("modules without async init are wrapped synchronously even inside async wrapper", () => {
+      // asyncmod has no module-level Async — its IIFE init is synchronous
       const source = 'Import "core"\nImport "asyncmod"\nresult = AsyncDouble(5)';
       const tmpFile = path.join(FIXTURES, "__tmp_async_test.nb");
       fs.writeFileSync(tmpFile, source);
@@ -160,8 +164,10 @@ describe("Integration Tests", () => {
         const result = compile(tmpFile);
         // core should be a sync IIFE (no await)
         expect(result.js).toMatch(/const core = \(\(\) => \{/);
-        // asyncmod should be async
-        expect(result.js).toMatch(/const asyncmod = await \(async \(\) => \{/);
+        // asyncmod has no WASM init — its module IIFE is also synchronous
+        expect(result.js).toMatch(/const asyncmod = \(\(\) => \{/);
+        // but calls to async functions are still awaited
+        expect(result.js).toContain("await asyncmod.asyncdouble(5)");
       } finally {
         fs.unlinkSync(tmpFile);
       }

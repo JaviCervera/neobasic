@@ -415,7 +415,23 @@ EndType
 
 The string after `=` maps the NeoBasic name to the JavaScript function name.
 
-Modules that require asynchronous initialisation (e.g. WASM) can declare `Async` at the top of the `.nbm` file. The compiled output will be wrapped in an async IIFE and the module loaded with `await`.
+Modules that require asynchronous initialisation (e.g. WASM) can declare `Async` on its own line at the top of the `.nbm` file. The compiled output will be wrapped in an async IIFE and the module loaded with `await`.
+
+Individual functions that return a `Promise` (and therefore require `await` at the call site) are declared with the `Async` keyword immediately before `Function`:
+
+```
+' Module-level Async: the module itself needs async init (WASM, etc.)
+Async
+
+' Only this function is awaited at every call site
+Async Function WindowShouldClose() As Bool = "windowShouldClose"
+
+' These are called synchronously — no await emitted
+Function BeginDrawing() = "beginDrawing"
+Function EndDrawing() = "endDrawing"
+```
+
+This keeps the generated code lean: only the handful of functions that genuinely return Promises get `await`, rather than every call in the program.
 
 #### Module implementation (`.js`)
 

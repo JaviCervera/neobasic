@@ -101,7 +101,7 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   const checkResult = check(program, absPath, env);
 
   // 5. Generate JS
-  const hasAsync = asyncModules.size > 0;
+  const hasAsync = asyncModules.size > 0 || [...env.funcs!.values()].some(f => f.isAsync);
   const moduleTypes = env.types!.size > 0 ? env.types! : undefined;
   const js = generate(program, checkResult, { moduleContents, asyncModules, async: hasAsync, moduleTypes });
 

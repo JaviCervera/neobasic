@@ -213,7 +213,7 @@ EndType
 
 Function InitWindow(width As Int, height As Int, title As String) = "initWindow"
 Function CloseWindow() = "closeWindow"
-Function WindowShouldClose() As Bool = "windowShouldClose"
+Async Function WindowShouldClose() As Bool = "windowShouldClose"
 Function IsWindowReady() As Bool = "isWindowReady"
 Function IsWindowFullscreen() As Bool = "isWindowFullscreen"
 Function IsWindowHidden() As Bool = "isWindowHidden"

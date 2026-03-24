@@ -262,6 +262,37 @@ describe("Code Generator", () => {
       expect(output).toMatch(/\}\)\(\);\s*$/); // ends with })();
     });
 
+    it("awaits only functions individually marked isAsync", () => {
+      const asyncFunc: FuncSymbol = {
+        params: [],
+        returnType: VOID,
+        isExternal: true,
+        externalName: "mymod.doThing",
+        isAsync: true,
+      };
+      const syncFunc: FuncSymbol = {
+        params: [],
+        returnType: VOID,
+        isExternal: true,
+        externalName: "mymod.otherThing",
+        isAsync: false,
+      };
+      const funcs = new Map<string, FuncSymbol>([
+        ["dothing", asyncFunc],
+        ["otherthing", syncFunc],
+      ]);
+      const tokens = lex("DoThing()\nOtherThing()", undefined);
+      const ast = parse(tokens);
+      const result = check(ast, "<test>", { funcs });
+      const output = generate(ast, result, {
+        moduleContents: new Map([["mymod", "module.exports = {};"]]),
+        async: true,
+      });
+      expect(output).toContain("await mymod.doThing()");
+      expect(output).not.toContain("await mymod.otherThing()");
+      expect(output).toContain("mymod.otherThing()");
+    });
+
     it("does not use async IIFE when async option is false", () => {
       const funcs = new Map<string, FuncSymbol>([["print", coreFunc]]);
       const tokens = lex('Print("hi")', undefined);
