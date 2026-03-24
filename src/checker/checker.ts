@@ -254,9 +254,10 @@ export function check(
     switch (stmt.kind) {
       case "VarDecl": {
         const name = stmt.name.toLowerCase();
-        if (vars.has(name)) {
+        if (vars.has(name) && !preRegisteredGlobals.has(name)) {
           err(`Variable '${stmt.name}' is already declared`, stmt.line, stmt.col);
         }
+        preRegisteredGlobals.delete(name);
         let varType: NbType;
         if (stmt.typeAnnotation) {
           varType = resolveTypeAnnotation(stmt.typeAnnotation);
@@ -357,9 +358,10 @@ export function check(
 
       case "ConstDecl": {
         const name = stmt.name.toLowerCase();
-        if (vars.has(name)) {
+        if (vars.has(name) && !preRegisteredGlobals.has(name)) {
           err(`Constant '${stmt.name}' is already declared`, stmt.line, stmt.col);
         }
+        preRegisteredGlobals.delete(name);
         const valType = checkExpr(stmt.value);
         vars.set(name, { type: valType, isConst: true });
         break;
@@ -538,6 +540,55 @@ export function check(
       }));
       const returnType = stmt.returnType ? resolveTypeAnnotation(stmt.returnType) : VOID;
       funcs.set(funcName, { params, returnType, isExternal: false });
+    }
+  }
+
+  // ── Pre-pass: register all top-level variables as globals ──────────
+  // This ensures functions defined before a variable assignment can still
+  // reference that variable — all top-level assignments create globals.
+  const preRegisteredGlobals = new Set<string>();
+  {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const stmt of program.statements) {
+        if (stmt.kind === "FunctionDecl" || stmt.kind === "TypeDecl") continue;
+        if (stmt.kind === "VarDecl") {
+          const name = stmt.name.toLowerCase();
+          if (vars.has(name)) continue;
+          try {
+            let varType: NbType;
+            if (stmt.typeAnnotation) {
+              varType = resolveTypeAnnotation(stmt.typeAnnotation);
+            } else if (stmt.initializer) {
+              varType = checkExpr(stmt.initializer);
+              if (varType.kind === "Null") continue;
+            } else continue;
+            vars.set(name, { type: varType, isConst: false });
+            preRegisteredGlobals.add(name);
+            changed = true;
+          } catch { /* defer — expression may reference a not-yet-known variable */ }
+        } else if (stmt.kind === "VarAssign") {
+          const name = stmt.name.toLowerCase();
+          if (vars.has(name)) continue;
+          try {
+            const valType = checkExpr(stmt.value);
+            if (valType.kind === "Null") continue;
+            vars.set(name, { type: valType, isConst: false });
+            preRegisteredGlobals.add(name);
+            changed = true;
+          } catch { /* defer */ }
+        } else if (stmt.kind === "ConstDecl") {
+          const name = stmt.name.toLowerCase();
+          if (vars.has(name)) continue;
+          try {
+            const valType = checkExpr(stmt.value);
+            vars.set(name, { type: valType, isConst: true });
+            preRegisteredGlobals.add(name);
+            changed = true;
+          } catch { /* defer */ }
+        }
+      }
     }
   }
 

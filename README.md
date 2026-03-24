@@ -153,7 +153,7 @@ a = "hello"  'a is a String
 a = 5        'Error: Can't assign Int to String
 ```
 
-Variables are **function-scoped** — a variable declared anywhere inside a function is visible throughout the entire function.
+Variables declared at the top level of a program are **global** — they can be read and written from any function, regardless of where in the source the function is defined. Variables declared inside a function are **local** to that function and do not leak out.
 
 ### Constants
 

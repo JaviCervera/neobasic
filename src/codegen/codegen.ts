@@ -25,6 +25,15 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
   // so that type-inferred assignments (VarAssign) emit `let` only on first use.
   let declaredVars = new Set<string>();
 
+  // Collect all top-level (global) variable names so that assignments to globals
+  // inside functions don't emit a spurious `let` (which would create a local shadow).
+  const globalVars = new Set<string>();
+  for (const stmt of program.statements) {
+    if (stmt.kind === "VarDecl" || stmt.kind === "VarAssign" || stmt.kind === "ConstDecl") {
+      globalVars.add(id(stmt.name));
+    }
+  }
+
   function emit(line: string): void {
     lines.push("  ".repeat(indent) + line);
   }
@@ -288,7 +297,9 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
         emit(`function ${id(stmt.name)}(${params}) {`);
         indent++;
         const outerDeclaredVars = declaredVars;
-        declaredVars = new Set(stmt.params.map(p => id(p.name)));
+        // Start with all globals + params so that assignments to global variables
+        // inside this function emit bare assignment (not `let`).
+        declaredVars = new Set([...globalVars, ...stmt.params.map(p => id(p.name))]);
         for (const s of stmt.body) emitStmt(s);
         declaredVars = outerDeclaredVars;
         indent--;

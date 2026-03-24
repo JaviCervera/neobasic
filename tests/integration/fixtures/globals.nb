@@ -1,0 +1,29 @@
+' Global defined before function — read from function
+counter = 0
+
+Function Increment()
+  counter = counter + 1
+EndFunction
+
+Increment()
+Increment()
+Increment()
+' counter should be 3
+
+' Global defined AFTER the function that uses it
+Function GetGreeting() As String
+  Return greeting
+EndFunction
+
+greeting = "hello"
+result = GetGreeting()
+' result should be "hello"
+
+' Function writes to a global, then main program reads it
+Function SetValue()
+  shared = 42
+EndFunction
+
+shared = 0
+SetValue()
+' shared should be 42

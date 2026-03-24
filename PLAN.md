@@ -10,7 +10,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 |---|---|
 | Integer division | `Int / Int` truncates to `Int` |
 | `=` vs `==` | `=` is always assignment; `==` is always equality |
-| Variable scoping | Function-scoped |
+| Variable scoping | Top-level variables are **global** (readable and writable from any function); variables declared inside a function are local to that function |
 | Standard library | A bundled `core` module (auto-imported) provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |

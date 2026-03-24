@@ -64,6 +64,15 @@ describe("Integration Tests", () => {
     });
   });
 
+  describe("globals.nb", () => {
+    it("compiles and runs correctly", () => {
+      const scope = compileAndRun("globals.nb");
+      expect(scope.counter).toBe(3);   // incremented three times via function
+      expect(scope.result).toBe("hello");  // global defined after the function
+      expect(scope.shared).toBe(42);   // global written from inside a function
+    });
+  });
+
   describe("recursion.nb", () => {
     it("compiles and runs correctly", () => {
       const scope = compileAndRun("recursion.nb");
