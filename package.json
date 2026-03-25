@@ -30,9 +30,9 @@
   },
   "homepage": "https://github.com/JaviCervera/neobasic#readme",
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@eslint/js": "^9.0.0",
     "@types/node": "^25.5.0",
-    "eslint": "^10.0.3",
+    "eslint": "^9.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1",
