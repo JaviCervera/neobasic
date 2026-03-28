@@ -46,8 +46,6 @@ export function generate(program: Program, checkResult: CheckResult, options?: C
     return name.toLowerCase();
   }
 
-  const asyncModuleSet = options?.asyncModules ?? new Set<string>();
-
   // ── Async wrapper (if needed) ────────────────────────────────
 
   const needsAsync = options?.async ?? false;
