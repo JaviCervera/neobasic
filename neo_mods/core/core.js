@@ -9,6 +9,8 @@ const _isNode = typeof process !== 'undefined' && process.versions != null && pr
 // via new Function('require', ...) in tests. In ESM contexts where require
 // is unavailable, _nodeRequire is null and file I/O degrades gracefully.
 const _nodeRequire = typeof require !== 'undefined' ? require : null;
+// QuickJS: std/os are available as globals when run with `qjs --std`
+const _isQJS = !_isNode && typeof globalThis.std !== 'undefined' && typeof globalThis.std.open === 'function';
 
 // ---------------------------------------------------------------------------
 // IO
@@ -21,10 +23,11 @@ function loadString(filename) {
     } catch (_e) {
       return '';
     }
-  } else if (!_isNode) {
+  } else if (_isQJS) {
+    return globalThis.std.loadFile(filename) ?? '';
+  } else {
     return localStorage.getItem(filename) ?? '';
   }
-  return '';
 }
 
 function print(message) {
@@ -43,7 +46,14 @@ function saveString(filename, str, append) {
     } catch (_e) {
       // silently no-op
     }
-  } else if (!_isNode) {
+  } else if (_isQJS) {
+    const existing = append ? (globalThis.std.loadFile(filename) ?? '') : '';
+    const f = globalThis.std.open(filename, 'w');
+    if (f) {
+      f.puts(existing + str);
+      f.close();
+    }
+  } else {
     if (append) {
       const existing = localStorage.getItem(filename) ?? '';
       localStorage.setItem(filename, existing + str);

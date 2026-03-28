@@ -93,6 +93,14 @@ This produces `dist/neobasic-qjs.js` with all Node.js APIs shimmed for QuickJS. 
 qjs dist\neobasic-qjs.js compile examples\hello.nb
 ```
 
+Then run the compiled output. For programs that use `LoadString` or `SaveString`, pass `--std` so QuickJS exposes its built-in `std` module for file I/O:
+
+```bash
+qjs --std examples\hello.js
+```
+
+Without `--std`, file I/O silently no-ops (same behaviour as running in a browser without `localStorage`).
+
 ## Using NeoBasic as a library
 
 NeoBasic can be used as a library in your own Node.js projects without being published to npm. Install it directly from GitHub:
@@ -678,7 +686,7 @@ All string indices and offsets are **0-based**.
 | `LoadString` | `(filename As String) As String` | Read a file as a string; returns `""` on error |
 | `SaveString` | `(filename As String, str As String, append As Bool)` | Write `str` to a file; if `append` is `True`, appends instead of overwriting |
 
-In **Node.js**, these use the file system (`fs.readFileSync` / `fs.writeFileSync` / `fs.appendFileSync`). In the **browser**, the `filename` argument is used as a `localStorage` key.
+In **Node.js**, these use the file system (`fs.readFileSync` / `fs.writeFileSync` / `fs.appendFileSync`). In **QuickJS**, run with `qjs --std` to enable file I/O via `std.loadFile` / `std.open`; without `--std`, file I/O silently no-ops. In the **browser**, the `filename` argument is used as a `localStorage` key.
 
 Example:
 
