@@ -30,6 +30,25 @@ function loadString(filename) {
   }
 }
 
+function input(prompt) {
+  if (_isNode && _nodeRequire) {
+    const fs = _nodeRequire('fs');
+    if (prompt) process.stdout.write(prompt);
+    const buf = Buffer.alloc(4096);
+    const n = fs.readSync(0, buf, 0, buf.length, null);
+    return buf.slice(0, n).toString('utf8').replace(/\r?\n$/, '');
+  } else if (_isQJS) {
+    if (prompt) {
+      globalThis.std.out.puts(prompt);
+      globalThis.std.out.flush();
+    }
+    return globalThis.std.in.getline() ?? '';
+  } else {
+    console.warn('Input() is not supported in the browser');
+    return '';
+  }
+}
+
 function print(message) {
   console.log(message);
 }
@@ -154,7 +173,7 @@ function extractExt(filename) {
 
 module.exports = {
   // IO
-  loadString, print, saveString,
+  input, loadString, print, saveString,
   // Math
   abs, acos, acosDeg, asin, asinDeg, atan, atan2, atan2Deg, atanDeg,
   ceil, clamp, cos, cosDeg, exp, floor, log, max, min, pow, sgn,

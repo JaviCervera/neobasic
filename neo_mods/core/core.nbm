@@ -1,4 +1,5 @@
 'IO
+Function Input(prompt As String) As String = "input"
 Function LoadString(filename As String) As String = "loadString"
 Function Print(message As String) = "print"
 Function SaveString(filename As String, str As String, append As Bool) = "saveString"

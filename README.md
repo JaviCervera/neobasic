@@ -63,9 +63,10 @@ node myprogram.js
 ### Run the examples
 
 ```bash
-node dist/cli.js compile examples/hello.nb && node examples/hello.js
-node dist/cli.js compile examples/math.nb  && node examples/math.js
+node dist/cli.js compile examples/hello.nb  && node examples/hello.js
+node dist/cli.js compile examples/math.nb   && node examples/math.js
 node dist/cli.js compile examples/string.nb && node examples/string.js
+node dist/cli.js compile examples/input.nb  && node examples/input.js
 ```
 
 The `examples/` directory already contains a `{ "type": "commonjs" }` package.json so file I/O works out of the box.
@@ -683,10 +684,11 @@ All string indices and offsets are **0-based**.
 
 | Function | Signature | Description |
 |---|---|---|
+| `Input` | `(prompt As String) As String` | Print `prompt` and read a line from stdin |
 | `LoadString` | `(filename As String) As String` | Read a file as a string; returns `""` on error |
 | `SaveString` | `(filename As String, str As String, append As Bool)` | Write `str` to a file; if `append` is `True`, appends instead of overwriting |
 
-In **Node.js**, these use the file system (`fs.readFileSync` / `fs.writeFileSync` / `fs.appendFileSync`). In **QuickJS**, run with `qjs --std` to enable file I/O via `std.loadFile` / `std.open`; without `--std`, file I/O silently no-ops. In the **browser**, the `filename` argument is used as a `localStorage` key.
+In **Node.js**, `Input` uses `fs.readSync` on stdin; `LoadString`/`SaveString` use the file system. In **QuickJS**, run with `qjs --std` to enable all I/O via `std.in.readline` / `std.loadFile` / `std.open`; without `--std`, I/O silently no-ops. In the **browser**, `Input` logs a warning and returns `""`; `LoadString`/`SaveString` use `localStorage`.
 
 Example:
 

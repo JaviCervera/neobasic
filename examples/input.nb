@@ -1,0 +1,2 @@
+name As String = Input("What is your name? ")
+Print("Hello, " + name + "!")

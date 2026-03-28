@@ -507,6 +507,7 @@ Located at `neo_mods/core/`. Automatically imported — no `Import` statement ne
 
 | Function | Signature | Description |
 |---|---|---|
+| `Input` | `(prompt As String) As String` | Print `prompt` and read a line from stdin (Node: `fs.readSync`; QJS `--std`: `std.in.readline`; Browser: logs a warning and returns `""`) |
 | `LoadString` | `(filename As String) As String` | Read file to string (Node: `fs.readFileSync`, returns `""` on error; QJS `--std`: `std.loadFile`; Browser: `localStorage.getItem`) |
 | `Print` | `(message As String)` | Print a line to stdout |
 | `SaveString` | `(filename As String, str As String, append As Bool)` | Write/append string to file (Node: `writeFileSync`/`appendFileSync`; QJS `--std`: `std.open`; Browser: `localStorage.setItem`) |
