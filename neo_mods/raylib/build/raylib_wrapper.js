@@ -2,10 +2,7 @@
 // NeoBasic Raylib Wrappers — glues emscripten WASM to module.exports
 // ═══════════════════════════════════════════════════════════════════
 
-const _isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
-
-const _moduleOpts = _isBrowser ? { canvas: document.getElementById('canvas') } : {};
-const M = await createRaylib(_moduleOpts);
+const M = await createRaylib({ canvas: document.getElementById('canvas') });
 
 // Helper: read Vector2 from float pointer
 function _v2(ptr) { return { x: M.HEAPF32[ptr >> 2], y: M.HEAPF32[(ptr >> 2) + 1] }; }
@@ -54,11 +51,7 @@ function magenta()    { return { r: 255, g: 0,   b: 255, a: 255 }; }
 function raywhite()   { return { r: 245, g: 245, b: 245, a: 255 }; }
 
 // ── Window management ─────────────────────────────────────────────
-function _requireBrowser(fn) {
-  if (!_isBrowser) throw new Error(`raylib: ${fn}() requires a browser environment (WebGL). Run the compiled .js in an HTML page.`);
-}
-
-function initWindow(w, h, title)  { _requireBrowser('InitWindow'); _withStr(title, p => M._bridge_InitWindow(w, h, p)); }
+function initWindow(w, h, title)  { _withStr(title, p => M._bridge_InitWindow(w, h, p)); }
 function closeWindow()            { M._bridge_CloseWindow(); }
 async function windowShouldClose() {
   return !!(await M.ccall('bridge_WindowShouldClose', 'number', [], [], { async: true }));
