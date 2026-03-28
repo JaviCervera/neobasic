@@ -119,7 +119,8 @@ describe("Integration Tests", () => {
       expect(result.js).toContain("const module = { exports: {} };");
       expect(result.js).toContain("return module.exports;");
       expect(result.js).toContain("})();");
-      expect(result.js).not.toContain("require(");
+      // Module JS is inlined as IIFE — no external module require() by path
+      expect(result.js).not.toMatch(/require\(['"][^'"]*[/\\][^'"]*['"]\)/);
     });
 
     it("bundled output runs correctly", () => {

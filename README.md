@@ -561,15 +561,87 @@ Foo("hello from NeoBasic!")
 
 ### Core module
 
-NeoBasic ships with a bundled `core` module that is **automatically imported** into every program — no `Import` statement is needed. It provides essential I/O and type-conversion functions:
+NeoBasic ships with a bundled `core` module that is **automatically imported** into every program — no `Import` statement is needed.
+
+#### Type conversion
 
 | Function | Signature | Description |
 |---|---|---|
-| `Print` | `(message As String)` | Print `message` followed by a newline |
 | `Str` | `(val As Int) As String` | Convert an `Int` to its string representation |
 | `StrF` | `(val As Float) As String` | Convert a `Float` to its string representation |
 | `Val` | `(s As String) As Int` | Parse a string as an `Int` (returns `0` on failure) |
 | `ValF` | `(s As String) As Float` | Parse a string as a `Float` (returns `0.0` on failure) |
+
+#### Debug
+
+| Function | Signature | Description |
+|---|---|---|
+| `Print` | `(message As String)` | Print `message` followed by a newline |
+
+#### Math
+
+All math functions take and return `Float`. Trigonometric functions that end in `Deg` work in degrees; all others work in radians.
+
+| Function | Signature | Description |
+|---|---|---|
+| `Abs` | `(x As Float) As Float` | Absolute value |
+| `ACos` | `(x As Float) As Float` | Arc cosine (radians) |
+| `ACosDeg` | `(x As Float) As Float` | Arc cosine (degrees) |
+| `ASin` | `(x As Float) As Float` | Arc sine (radians) |
+| `ASinDeg` | `(x As Float) As Float` | Arc sine (degrees) |
+| `ATan` | `(x As Float) As Float` | Arc tangent (radians) |
+| `ATanDeg` | `(x As Float) As Float` | Arc tangent (degrees) |
+| `ATan2` | `(y As Float, x As Float) As Float` | Two-argument arc tangent (radians) |
+| `ATan2Deg` | `(y As Float, x As Float) As Float` | Two-argument arc tangent (degrees) |
+| `Ceil` | `(x As Float) As Float` | Round up to nearest integer |
+| `Clamp` | `(x As Float, min As Float, max As Float) As Float` | Clamp `x` to `[min, max]` |
+| `Cos` | `(x As Float) As Float` | Cosine (radians) |
+| `CosDeg` | `(x As Float) As Float` | Cosine (degrees) |
+| `Exp` | `(x As Float) As Float` | Natural exponential (eˣ) |
+| `Floor` | `(x As Float) As Float` | Round down to nearest integer |
+| `Log` | `(x As Float) As Float` | Natural logarithm |
+| `Max` | `(a As Float, b As Float) As Float` | Larger of two values |
+| `Min` | `(a As Float, b As Float) As Float` | Smaller of two values |
+| `Pow` | `(x As Float, y As Float) As Float` | `x` raised to the power `y` |
+| `Sgn` | `(x As Float) As Float` | Sign: `-1.0`, `0.0`, or `1.0` |
+| `Sin` | `(x As Float) As Float` | Sine (radians) |
+| `SinDeg` | `(x As Float) As Float` | Sine (degrees) |
+| `Sqrt` | `(x As Float) As Float` | Square root |
+| `Tan` | `(x As Float) As Float` | Tangent (radians) |
+| `TanDeg` | `(x As Float) As Float` | Tangent (degrees) |
+
+#### String
+
+All string indices and offsets are **0-based**.
+
+| Function | Signature | Description |
+|---|---|---|
+| `Asc` | `(str As String, index As Int) As Int` | Character code at `index` |
+| `Chr` | `(code As Int) As String` | Character from character code |
+| `ExtractDir` | `(filename As String) As String` | Directory portion including trailing separator (e.g. `"path/to/"`) |
+| `ExtractExt` | `(filename As String) As String` | Extension without the dot (e.g. `"txt"`); `""` for dotfiles or no extension |
+| `Find` | `(str As String, find As String, offset As Int) As Int` | First index of `find` starting from `offset`; `-1` if not found |
+| `Join` | `(list As String[], separator As String) As String` | Join array elements with `separator` |
+| `Left` | `(str As String, count As Int) As String` | First `count` characters |
+| `Len` | `(str As String) As Int` | String length |
+| `Lower` | `(str As String) As String` | Convert to lowercase |
+| `Mid` | `(str As String, offset As Int, count As Int) As String` | Substring starting at `offset` with length `count` |
+| `Replace` | `(str As String, find As String, rep As String) As String` | Replace all occurrences of `find` with `rep` |
+| `Right` | `(str As String, count As Int) As String` | Last `count` characters |
+| `Split` | `(str As String, separator As String) As String[]` | Split string into an array |
+| `StripDir` | `(filename As String) As String` | Filename without directory (e.g. `"file.txt"`) |
+| `StripExt` | `(filename As String) As String` | Filename without extension (e.g. `"path/to/file"`); dotfiles unchanged |
+| `Trim` | `(str As String) As String` | Remove leading and trailing whitespace |
+| `Upper` | `(str As String) As String` | Convert to uppercase |
+
+#### File I/O
+
+| Function | Signature | Description |
+|---|---|---|
+| `LoadString` | `(filename As String) As String` | Read a file as a string; returns `""` on error |
+| `SaveString` | `(filename As String, str As String, append As Int)` | Write `str` to a file; if `append` is non-zero, appends instead of overwriting |
+
+In **Node.js**, these use the file system (`fs.readFileSync` / `fs.writeFileSync` / `fs.appendFileSync`). In the **browser**, the `filename` argument is used as a `localStorage` key.
 
 Example:
 
@@ -577,6 +649,9 @@ Example:
 Print("Enter a number:")
 n = Val("42")
 Print("Double: " + Str(n * 2))
+Print(StrF(Sin(0.0)))
+words = Split("hello world", " ")
+Print(Upper(words[0]))
 ```
 
 ### Raylib module

@@ -1,5 +1,10 @@
 # NeoBasic Compiler — Implementation Plan
 
+## Documentation Rules
+
+- **`CLAUDE.md` must always be kept up to date.** Whenever a design decision changes, a new phase is completed, a module is added or modified, or any architectural detail shifts, update the relevant section of this file before considering the work done.
+- **`README.md` must always be kept up to date.** Any user-facing change — new functions, new CLI flags, new install steps, changed behaviour — must be reflected in `README.md` as part of the same change.
+
 ## Summary
 
 NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to JavaScript. The compiler is written in **idiomatic TypeScript (strict mode)** and distributed as a **CLI tool** (`neobasic compile input.nb`). Output JS runs in Node or a browser.
@@ -450,17 +455,73 @@ CloseWindow()
 
 ### `core`
 
-Located at `neo_mods/core/`. Provides essential I/O and conversion functions:
+Located at `neo_mods/core/`. Automatically imported — no `Import` statement needed.
+
+#### IO
 
 | Function | Signature | Description |
 |---|---|---|
+| `LoadString` | `(filename As String) As String` | Read file to string (Node: `fs.readFileSync`, returns `""` on error; Browser: `localStorage.getItem`) |
 | `Print` | `(message As String)` | Print a line to stdout |
+| `SaveString` | `(filename As String, str As String, append As Int)` | Write/append string to file (Node: `writeFileSync`/`appendFileSync`; Browser: `localStorage.setItem`) |
+
+#### Math
+
+All math functions take and return `Float`.
+
+| Function | Signature | Description |
+|---|---|---|
+| `Abs` | `(x As Float) As Float` | Absolute value |
+| `ACos` | `(x As Float) As Float` | Arccosine (radians) |
+| `ACosDeg` | `(x As Float) As Float` | Arccosine (degrees) |
+| `ASin` | `(x As Float) As Float` | Arcsine (radians) |
+| `ASinDeg` | `(x As Float) As Float` | Arcsine (degrees) |
+| `ATan` | `(x As Float) As Float` | Arctangent (radians) |
+| `ATan2` | `(y As Float, x As Float) As Float` | Two-argument arctangent (radians) |
+| `ATan2Deg` | `(y As Float, x As Float) As Float` | Two-argument arctangent (degrees) |
+| `ATanDeg` | `(x As Float) As Float` | Arctangent (degrees) |
+| `Ceil` | `(x As Float) As Float` | Ceiling |
+| `Clamp` | `(x As Float, min As Float, max As Float) As Float` | Clamp x between min and max |
+| `Cos` | `(x As Float) As Float` | Cosine (radians) |
+| `CosDeg` | `(x As Float) As Float` | Cosine (degrees) |
+| `Exp` | `(x As Float) As Float` | e^x |
+| `Floor` | `(x As Float) As Float` | Floor |
+| `Log` | `(x As Float) As Float` | Natural logarithm |
+| `Max` | `(a As Float, b As Float) As Float` | Maximum of two values |
+| `Min` | `(a As Float, b As Float) As Float` | Minimum of two values |
+| `Pow` | `(x As Float, y As Float) As Float` | x raised to power y |
+| `Sgn` | `(x As Float) As Float` | Sign: -1, 0, or 1 |
+| `Sin` | `(x As Float) As Float` | Sine (radians) |
+| `SinDeg` | `(x As Float) As Float` | Sine (degrees) |
+| `Sqrt` | `(x As Float) As Float` | Square root |
+| `Tan` | `(x As Float) As Float` | Tangent (radians) |
+| `TanDeg` | `(x As Float) As Float` | Tangent (degrees) |
+
+#### String
+
+| Function | Signature | Description |
+|---|---|---|
+| `Asc` | `(str As String, index As Int) As Int` | Char code at 0-based index |
+| `Chr` | `(code As Int) As String` | Char from char code |
+| `ExtractDir` | `(filename As String) As String` | Directory portion with trailing separator, `""` if none |
+| `ExtractExt` | `(filename As String) As String` | Extension without dot; `""` if none or dotfile |
+| `Find` | `(str As String, find As String, offset As Int) As Int` | 0-based indexOf, `-1` if not found |
+| `Join` | `(list As String[], separator As String) As String` | Join array with separator |
+| `Left` | `(str As String, count As Int) As String` | First `count` characters |
+| `Len` | `(str As String) As Int` | String length |
+| `Lower` | `(str As String) As String` | Convert to lowercase |
+| `Mid` | `(str As String, offset As Int, count As Int) As String` | Substring (0-based offset, length count) |
+| `Replace` | `(str As String, find As String, rep As String) As String` | Replace all occurrences |
+| `Right` | `(str As String, count As Int) As String` | Last `count` characters |
+| `Split` | `(str As String, separator As String) As String[]` | Split string into array |
 | `Str` | `(val As Int) As String` | Convert Int to String |
 | `StrF` | `(val As Float) As String` | Convert Float to String |
+| `StripDir` | `(filename As String) As String` | Filename without directory |
+| `StripExt` | `(filename As String) As String` | Filename without extension (dotfiles unchanged) |
+| `Trim` | `(str As String) As String` | Remove leading/trailing whitespace |
+| `Upper` | `(str As String) As String` | Convert to uppercase |
 | `Val` | `(s As String) As Int` | Parse String to Int |
 | `ValF` | `(s As String) As Float` | Parse String to Float |
-
-Usage: Automatically imported — no `Import` statement needed.
 
 ### `raylib`
 
