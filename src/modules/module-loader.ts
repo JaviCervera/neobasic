@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
+import { fileURLToPath } from "node:url";
 import { lex } from "../lexer/index.js";
 import { Token, TokenKind } from "../lexer/tokens.js";
 import { ModuleError } from "../errors.js";
@@ -27,7 +28,7 @@ export function resolveModule(moduleName: string, cwd: string): ModuleDefinition
     path.join(cwd, "neo_mods"),
     path.join(os.homedir(), "neo_mods"),
     // Compiler install dir
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "..", "neo_mods"),
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "neo_mods"),
   ];
 
   for (const dir of searchDirs) {
