@@ -74,6 +74,99 @@ npm link
 neobasic compile myprogram.nb
 ```
 
+## Using NeoBasic as a library
+
+NeoBasic can be used as a library in your own Node.js projects without being published to npm. Install it directly from GitHub:
+
+```bash
+npm install github:JaviCervera/neobasic
+```
+
+npm will automatically build the package during installation (via the `prepare` script), so no extra steps are required.
+
+### High-level API
+
+The simplest way to compile NeoBasic source code from your application is with `compileSource`, which takes a source string and returns a JavaScript string:
+
+```javascript
+import { compileSource } from 'neobasic';
+
+const nbSource = `
+Print("Hello from NeoBasic!")
+`;
+
+const jsOutput = compileSource(nbSource);
+console.log(jsOutput);
+```
+
+If your program uses `Import` statements that refer to custom modules, pass the `cwd` option so the module loader can find them in `<cwd>/neo_mods/`:
+
+```javascript
+const jsOutput = compileSource(nbSource, { cwd: '/path/to/your/project' });
+```
+
+> **Module resolution:** the loader searches three locations in order:
+> 1. `<cwd>/neo_mods/` — project-local modules
+> 2. `~/neo_mods/` — user-global modules
+> 3. The `neo_mods/` directory bundled with the neobasic package — this always contains `core`, so the built-in library works out of the box without any configuration
+>
+> `Include` statements are not supported when compiling from a string. Use the file-based `compile()` function instead if you need them.
+
+The `compile()` function compiles a `.nb` file on disk and additionally supports `Include` statements. It returns both the JavaScript output and the populated type-checker environment:
+
+```javascript
+import { compile } from 'neobasic';
+
+const { js, env } = compile('myprogram.nb');
+```
+
+### Running each compiler phase individually
+
+All pipeline stages are exported so you can run them independently:
+
+```javascript
+import { lex } from 'neobasic/dist/lexer/index.js';
+import { parse } from 'neobasic/dist/parser/index.js';
+import { check } from 'neobasic/dist/checker/index.js';
+import { generate } from 'neobasic/dist/codegen/index.js';
+import { resolveModule } from 'neobasic/dist/modules/index.js';
+import * as fs from 'node:fs';
+
+const source = `
+a As Int = 21
+Print(Str(a * 2))
+`;
+
+// 1. Lex: source string → flat token stream
+const tokens = lex(source, '<myfile>');
+
+// 2. Parse: tokens → typed AST
+const program = parse(tokens, '<myfile>');
+
+// 3. Resolve modules and build the checker environment
+//    (core is always needed; add extra resolveModule calls for each Import)
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const cwd = process.cwd();
+const coreModule = resolveModule('core', cwd);
+const moduleContents = new Map([[coreModule.name, fs.readFileSync(coreModule.jsPath, 'utf-8')]]);
+const env = {
+  funcs: new Map([...coreModule.funcs]),
+  vars:  new Map([...coreModule.consts].map(([k, v]) => [k, { type: v.type, isConst: true }])),
+  types: new Map([...coreModule.types]),
+};
+
+// 4. Type-check: annotates the AST with resolved types
+const checkResult = check(program, '<myfile>', env);
+
+// 5. Generate: annotated AST → JavaScript string
+const js = generate(program, checkResult, { moduleContents });
+
+console.log(js);
+```
+
+---
+
 ## Architecture
 
 The compiler is a classic multi-phase pipeline:

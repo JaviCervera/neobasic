@@ -14,6 +14,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Standard library | A bundled `core` module (auto-imported) provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
+| Library distribution | Installable directly from GitHub via `npm install github:JaviCervera/neobasic`; `prepare` script builds `dist/` automatically |
 
 ## Architecture
 
@@ -63,7 +64,7 @@ src/
   modules/
     module-loader.ts  Resolves and parses .nbm files and locates companion .js files
   errors.ts         Diagnostic error types (with source location)
-  compiler.ts       Orchestrates all phases; public API
+  compiler.ts       Orchestrates all phases; public API (`compile`, `compileSource`)
   cli.ts            CLI entry point (compile command)
 tests/
   lexer/
@@ -275,7 +276,9 @@ Create `neo_mods/raylib/build/` containing:
 3. **`raylib_wrapper.js`** — JS wrappers mapping all ~383 NeoBasic function names to WASM bridge calls, with struct marshaling helpers.
 4. **`exported_functions.txt`** — list of all bridge function symbols for emscripten linker.
 
-**Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web,node --no-entry -Os`
+**Key emscripten flags:** `-sMODULARIZE=1 -sSINGLE_FILE=1 -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sASYNCIFY -sENVIRONMENT=web --no-entry -Os`
+
+**Environment constraint:** The module targets `web` only — it requires a WebGL context and a `<canvas>` element and cannot function in Node.js. The wrapper must not include any Node.js environment detection; `document.getElementById('canvas')` is passed unconditionally to the Emscripten module initialiser.
 
 **ASYNCIFY note:** Raylib's web platform calls `emscripten_sleep(16)` inside `WindowShouldClose()` for frame pacing. The JS wrapper uses `M.ccall('bridge_WindowShouldClose', ..., {async: true})` to properly handle ASYNCIFY suspension/resumption. `WindowShouldClose` is declared `Async Function` in `raylib.nbm` so only that call site is awaited; the hundreds of other Raylib calls are emitted without `await`, avoiding unnecessary microtask overhead.
 
@@ -420,6 +423,28 @@ CloseWindow()
 - Update `README.md` with Raylib module reference
 - Document WASM build process for contributors
 - Add the example above to `examples/`
+
+### Phase 10 — Library API
+
+**Goal:** Allow NeoBasic to be used as a Node.js library without being published to npm, installable directly from GitHub.
+
+**Changes:**
+
+- **`package.json`** — added `"prepare": "npm run build"` script. npm runs `prepare` automatically after `npm install github:…`, which builds `dist/` from source. This is needed because `dist/` is gitignored.
+
+- **`src/compiler.ts`** — added `compileSource(source: string, options?: CompileSourceOptions): string`:
+  - Takes a NeoBasic source string, returns compiled JavaScript string.
+  - Does **not** support `Include` (throws a clear error if encountered — use `compile()` for file-based workflows with includes).
+  - Accepts `CompileSourceOptions.cwd` for module resolution (defaults to `process.cwd()`).
+  - Uses the same module resolution and pipeline as `compile()`.
+  - `core` is always resolved from the package install directory; no configuration needed for built-in modules.
+
+- **`README.md`** — added "Using NeoBasic as a library" section documenting:
+  - GitHub install command
+  - `compileSource()` high-level API
+  - `compile()` for file-based use
+  - Step-by-step individual phase usage (lex → parse → check → generate)
+  - Module resolution behaviour
 
 ## Bundled modules
 

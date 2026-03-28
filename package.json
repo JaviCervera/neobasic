@@ -8,6 +8,7 @@
     "neobasic": "dist/cli.js"
   },
   "scripts": {
+    "prepare": "npm run build",
     "build": "tsc",
     "lint": "eslint src tests",
     "test": "vitest run",

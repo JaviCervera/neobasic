@@ -12,6 +12,11 @@ export interface CompileOptions {
   cwd?: string;
 }
 
+export interface CompileSourceOptions {
+  /** Working directory for resolving modules. Defaults to process.cwd(). */
+  cwd?: string;
+}
+
 export interface CompileResult {
   js: string;
   env: CheckerEnv;
@@ -106,4 +111,84 @@ export function compile(sourceFile: string, options?: CompileOptions): CompileRe
   const js = generate(program, checkResult, { moduleContents, asyncModules, async: hasAsync, moduleTypes });
 
   return { js, env: checkResult.env };
+}
+
+/**
+ * Compile a NeoBasic source string directly to a JavaScript string.
+ *
+ * This is the primary library entry point. Unlike `compile()`, it does not
+ * read from the file system and does not support `Include` statements.
+ *
+ * Module resolution (for `Import` statements) searches:
+ *  1. `<cwd>/neo_mods/` — project-local modules
+ *  2. `~/neo_mods/` — user-global modules
+ *  3. The `neo_mods/` directory bundled with the neobasic package — always
+ *     contains `core`, so the built-in library is available without any
+ *     extra configuration.
+ *
+ * @param source  NeoBasic source code.
+ * @param options Optional. Pass `cwd` if your program imports custom modules
+ *                so the loader can find them in `<cwd>/neo_mods/`.
+ *                Defaults to `process.cwd()`.
+ * @returns The compiled JavaScript source string.
+ */
+export function compileSource(source: string, options?: CompileSourceOptions): string {
+  const cwd = options?.cwd ?? process.cwd();
+
+  // 1. Lex + parse
+  const tokens = lex(source, "<source>");
+  const mainAst = parse(tokens, "<source>");
+
+  // 2. Collect statements — Include is not supported for string input
+  const allStatements: Stmt[] = [];
+  const importStmts: Stmt[] = [];
+
+  for (const stmt of mainAst.statements) {
+    if (stmt.kind === "IncludeStmt") {
+      throw new NeoBasicError(
+        "Include is not supported when compiling from a string. Use compile() with a file path instead.",
+        "<source>", stmt.line, stmt.col,
+      );
+    } else if (stmt.kind === "ImportStmt") {
+      importStmts.push(stmt);
+    } else {
+      allStatements.push(stmt);
+    }
+  }
+
+  // 3. Resolve modules
+  const moduleContents = new Map<string, string>();
+  const asyncModules = new Set<string>();
+  const env: Partial<CheckerEnv> = {
+    funcs: new Map<string, FuncSymbol>(),
+    vars: new Map<string, VarSymbol>(),
+    types: new Map<string, TypeDeclSymbol>(),
+  };
+
+  const coreModule = resolveModule("core", cwd);
+  moduleContents.set(coreModule.name, fs.readFileSync(coreModule.jsPath, "utf-8"));
+  for (const [name, func] of coreModule.funcs) env.funcs!.set(name, func);
+  for (const [name, constDef] of coreModule.consts) env.vars!.set(name, { type: constDef.type, isConst: true });
+  for (const [name, typeDef] of coreModule.types) env.types!.set(name, typeDef);
+
+  for (const stmt of importStmts) {
+    if (stmt.kind === "ImportStmt") {
+      if (stmt.moduleName === "core") continue;
+      const moduleDef = resolveModule(stmt.moduleName, cwd);
+      moduleContents.set(moduleDef.name, fs.readFileSync(moduleDef.jsPath, "utf-8"));
+      if (moduleDef.async) asyncModules.add(moduleDef.name);
+      for (const [name, func] of moduleDef.funcs) env.funcs!.set(name, func);
+      for (const [name, constDef] of moduleDef.consts) env.vars!.set(name, { type: constDef.type, isConst: true });
+      for (const [name, typeDef] of moduleDef.types) env.types!.set(name, typeDef);
+    }
+  }
+
+  // 4. Type check
+  const program: Program = { statements: allStatements };
+  const checkResult = check(program, "<source>", env);
+
+  // 5. Generate JS
+  const hasAsync = asyncModules.size > 0 || [...env.funcs!.values()].some(f => f.isAsync);
+  const moduleTypes = env.types!.size > 0 ? env.types! : undefined;
+  return generate(program, checkResult, { moduleContents, asyncModules, async: hasAsync, moduleTypes });
 }
