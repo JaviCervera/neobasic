@@ -21,6 +21,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Output | Single `.js` file next to the source (or via `-o` flag) |
 | Node.js module mode | Compiled output uses `require` for file I/O; must run in a CJS context (no `"type": "module"` in the nearest `package.json`). The `examples/` directory ships a `{"type":"commonjs"}` package.json for this reason. |
 | Library distribution | Installable directly from GitHub via `npm install github:JaviCervera/neobasic`; `prepare` script builds `dist/` automatically |
+| QuickJS support | `npm run bundle:qjs` produces `dist/neobasic-qjs.js` — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/`; run as `qjs dist/neobasic-qjs.js compile file.nb` |
 
 ## Architecture
 
@@ -69,6 +70,12 @@ src/
     codegen.ts      Walks the typed AST and emits a JS string
   modules/
     module-loader.ts  Resolves and parses .nbm files and locates companion .js files
+  shims/
+    qjs-fs.js         QuickJS shim for node:fs (std.open / os.stat)
+    qjs-os.js         QuickJS shim for node:os (std.getenv)
+    qjs-path.js       QuickJS shim for node:path (pure JS, normalises separators)
+    qjs-process.js    QuickJS shim for process global (scriptArgs, os.getcwd, std.exit); also polyfills console.error/warn
+    qjs-url.js        QuickJS shim for node:url (fileURLToPath)
   errors.ts         Diagnostic error types (with source location)
   compiler.ts       Orchestrates all phases; public API (`compile`, `compileSource`)
   cli.ts            CLI entry point (compile command)
@@ -452,6 +459,44 @@ CloseWindow()
   - Step-by-step individual phase usage (lex → parse → check → generate)
   - Module resolution behaviour
 
+### Phase 11 — QuickJS Support
+
+**Goal:** Allow `neobasic` to run under [QuickJS](https://bellard.org/quickjs/) as a self-contained CLI binary.
+
+**Why a separate bundle:** The standard `dist/neobasic.js` is built with `--platform node`, leaving `node:fs`, `node:path`, `node:os`, `node:url` as static ESM imports. QuickJS cannot resolve these. Setting `globalThis` polyfills before the bundle loads does not help — static module imports are resolved before any user code runs. The solution is to replace the Node.js module imports at bundle time using esbuild's `--alias` option.
+
+**Changes:**
+
+- **`src/shims/qjs-*.js`** — Five shim files that substitute Node.js built-ins with QuickJS equivalents:
+  - `qjs-fs.js`: `existsSync` / `readFileSync` / `writeFileSync` via QuickJS `std.open`, `std.loadFile`, `os.stat`
+  - `qjs-path.js`: `join` / `dirname` / `resolve` / `parse` / `basename` in pure JS; normalises `\` → `/`; resolves `..` segments correctly (Node's `path.join` normalises `..`, unlike a naive concatenation)
+  - `qjs-os.js`: `homedir` via `std.getenv("HOME")` / `USERPROFILE`
+  - `qjs-url.js`: `fileURLToPath` strips `file:///` prefix (handles Windows `file:///C:/...` form)
+  - `qjs-process.js`: injected as a global via esbuild `--inject`; provides `process.argv` (from `scriptArgs`, shifted to match Node's `.slice(2)` convention), `process.cwd()`, and `process.exit()`; also polyfills `console.error` / `console.warn` (QuickJS only guarantees `console.log`)
+
+- **`src/modules/module-loader.ts`** — search path for the package's own `neo_mods/` now tries **both** `../neo_mods` and `../../neo_mods` relative to `import.meta.url`. This handles: single-file bundle at `dist/neobasic-qjs.js` (one level up) and the standard multi-file build at `dist/modules/module-loader.js` (two levels up).
+
+- **`src/cli.ts`** — changed `→` to `->` in the compilation success message. QuickJS on Windows outputs UTF-8 but the default Windows console interprets it as CP1252, garbling the arrow.
+
+- **`package.json`** — added `"bundle:qjs"` script:
+  ```
+  esbuild src/cli.ts --bundle --minify --format=esm
+    --alias:node:fs=./src/shims/qjs-fs.js
+    --alias:node:path=./src/shims/qjs-path.js
+    --alias:node:os=./src/shims/qjs-os.js
+    --alias:node:url=./src/shims/qjs-url.js
+    --inject:src/shims/qjs-process.js
+    --external:std --external:os
+    --outfile=dist/neobasic-qjs.js
+  ```
+  `std` and `os` are kept external so QuickJS resolves them as built-in modules at runtime.
+
+**Usage:**
+```sh
+npm run bundle:qjs
+qjs dist/neobasic-qjs.js compile myprogram.nb
+```
+
 ## Bundled modules
 
 ### `core`
@@ -464,7 +509,7 @@ Located at `neo_mods/core/`. Automatically imported — no `Import` statement ne
 |---|---|---|
 | `LoadString` | `(filename As String) As String` | Read file to string (Node: `fs.readFileSync`, returns `""` on error; Browser: `localStorage.getItem`) |
 | `Print` | `(message As String)` | Print a line to stdout |
-| `SaveString` | `(filename As String, str As String, append As Int)` | Write/append string to file (Node: `writeFileSync`/`appendFileSync`; Browser: `localStorage.setItem`) |
+| `SaveString` | `(filename As String, str As String, append As Bool)` | Write/append string to file (Node: `writeFileSync`/`appendFileSync`; Browser: `localStorage.setItem`) |
 
 #### Math
 

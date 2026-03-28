@@ -24,11 +24,14 @@ export interface ModuleDefinition {
  *  3. neo_mods/ in the current working directory
  */
 export function resolveModule(moduleName: string, cwd: string): ModuleDefinition {
+  const packageDir = path.dirname(fileURLToPath(import.meta.url));
   const searchDirs = [
     path.join(cwd, "neo_mods"),
     path.join(os.homedir(), "neo_mods"),
-    // Compiler install dir
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "neo_mods"),
+    // Support both a single-file bundle (dist/neobasic.js → one level up)
+    // and the standard multi-file build (dist/modules/module-loader.js → two levels up).
+    path.join(packageDir, "..", "neo_mods"),
+    path.join(packageDir, "..", "..", "neo_mods"),
   ];
 
   for (const dir of searchDirs) {

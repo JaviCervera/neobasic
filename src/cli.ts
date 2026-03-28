@@ -64,7 +64,7 @@ function main(): void {
   try {
     const result = compile(inputFile!);
     fs.writeFileSync(outputFile!, result.js, "utf-8");
-    console.log(`Compiled ${inputFile} → ${outputFile}`);
+    console.log(`Compiled ${inputFile} -> ${outputFile}`);
   } catch (e) {
     if (e instanceof NeoBasicError) {
       console.error(`Error: ${e.message}`);

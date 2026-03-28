@@ -13,7 +13,8 @@
     "lint": "eslint src tests",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bundle": "tsup --entry.neobasic src/compiler.ts --minify --platform node --format esm --out-dir dist"
+    "bundle": "tsup --entry.neobasic src/compiler.ts --minify --platform node --format esm --out-dir dist",
+    "bundle:qjs": "esbuild src/cli.ts --bundle --minify --format=esm --alias:node:fs=./src/shims/qjs-fs.js --alias:node:path=./src/shims/qjs-path.js --alias:node:os=./src/shims/qjs-os.js --alias:node:url=./src/shims/qjs-url.js --inject:src/shims/qjs-process.js --external:std --external:os --outfile=dist/neobasic-qjs.js"
   },
   "repository": {
     "type": "git",

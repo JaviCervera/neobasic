@@ -1,6 +1,6 @@
 # NeoBasic
 
-NeoBasic is a structured, BASIC-like programming language inspired by [Blitz3D](https://en.wikipedia.org/wiki/Blitz_BASIC). It transpiles to JavaScript and can target both Node.js and web browsers.
+NeoBasic is a structured, BASIC-like programming language inspired by [BlitzBasic](https://en.wikipedia.org/wiki/Blitz_BASIC). It transpiles to JavaScript and can target both Node.js and web browsers.
 
 The compiler is written in idiomatic TypeScript (strict mode) and distributed as a CLI tool.
 
@@ -79,6 +79,20 @@ npm link
 neobasic compile myprogram.nb
 ```
 
+### Using with QuickJS
+
+NeoBasic can also be compiled to a self-contained bundle that runs under [QuickJS](https://bellard.org/quickjs/):
+
+```bash
+npm run bundle:qjs
+```
+
+This produces `dist/neobasic-qjs.js` with all Node.js APIs shimmed for QuickJS. Use it as a drop-in CLI replacement:
+
+```bash
+qjs dist\neobasic-qjs.js compile examples\hello.nb
+```
+
 ## Using NeoBasic as a library
 
 NeoBasic can be used as a library in your own Node.js projects without being published to npm. Install it directly from GitHub:
@@ -127,13 +141,21 @@ const { js, env } = compile('myprogram.nb');
 
 ### Bundling as a single redistributable file
 
-If you need a single, minified `neobasic.js` for Node.js distribution or embedding, use [tsup](https://tsup.egoist.dev):
+**Node.js bundle** — a single minified `neobasic.js` with all dependencies inlined:
 
 ```bash
 npm run bundle
 ```
 
-This produces `dist/neobasic.js` — a self-contained, minified bundle with all dependencies inlined. No prior `npm run build` step is required; tsup handles TypeScript transpilation itself.
+Produces `dist/neobasic.js` (library API: exports `compileSource` and `compile`).
+
+**QuickJS bundle** — a self-contained CLI bundle with Node.js APIs shimmed for QuickJS:
+
+```bash
+npm run bundle:qjs
+```
+
+Produces `dist/neobasic-qjs.js`. No prior `npm run build` step is needed for either bundle; the bundler handles TypeScript transpilation itself.
 
 ### Running each compiler phase individually
 
