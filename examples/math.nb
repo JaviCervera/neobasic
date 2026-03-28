@@ -1,0 +1,59 @@
+Print("=== Math Functions ===")
+Print("")
+
+' --- Rounding and sign ---
+Print("-- Rounding & Sign --")
+Print("Abs(-7.5)       = " + StrF(Abs(-7.5)))
+Print("Ceil(2.1)       = " + StrF(Ceil(2.1)))
+Print("Floor(2.9)      = " + StrF(Floor(2.9)))
+Print("Sgn(-4.0)       = " + StrF(Sgn(-4.0)))
+Print("Sgn(0.0)        = " + StrF(Sgn(0.0)))
+Print("Sgn(4.0)        = " + StrF(Sgn(4.0)))
+Print("")
+
+' --- Clamp ---
+Print("-- Clamp --")
+Print("Clamp(-5, 0, 10) = " + StrF(Clamp(-5.0, 0.0, 10.0)))
+Print("Clamp(5, 0, 10)  = " + StrF(Clamp(5.0, 0.0, 10.0)))
+Print("Clamp(15, 0, 10) = " + StrF(Clamp(15.0, 0.0, 10.0)))
+Print("")
+
+' --- Min / Max ---
+Print("-- Min / Max --")
+Print("Min(3, 7) = " + StrF(Min(3.0, 7.0)))
+Print("Max(3, 7) = " + StrF(Max(3.0, 7.0)))
+Print("")
+
+' --- Powers and roots ---
+Print("-- Powers & Roots --")
+Print("Sqrt(144)    = " + StrF(Sqrt(144.0)))
+Print("Pow(2, 10)   = " + StrF(Pow(2.0, 10.0)))
+Print("Exp(1)       = " + StrF(Exp(1.0)))
+Print("Log(Exp(1))  = " + StrF(Log(Exp(1.0))))
+Print("")
+
+' --- Trigonometry (radians) ---
+Print("-- Trigonometry (radians) --")
+pi As Float = 3.14159265358979
+Print("Sin(pi/2) = " + StrF(Sin(pi / 2.0)))
+Print("Cos(0)    = " + StrF(Cos(0.0)))
+Print("Tan(pi/4) = " + StrF(Tan(pi / 4.0)))
+Print("")
+
+' --- Inverse trigonometry (radians) ---
+Print("-- Inverse Trig (radians) --")
+Print("ASin(1)      = " + StrF(ASin(1.0)))
+Print("ACos(1)      = " + StrF(ACos(1.0)))
+Print("ATan(1)      = " + StrF(ATan(1.0)))
+Print("ATan2(1, 1)  = " + StrF(ATan2(1.0, 1.0)))
+Print("")
+
+' --- Trigonometry (degrees) ---
+Print("-- Trigonometry (degrees) --")
+Print("SinDeg(90)      = " + StrF(SinDeg(90.0)))
+Print("CosDeg(0)       = " + StrF(CosDeg(0.0)))
+Print("TanDeg(45)      = " + StrF(TanDeg(45.0)))
+Print("ASinDeg(1)      = " + StrF(ASinDeg(1.0)))
+Print("ACosDeg(1)      = " + StrF(ACosDeg(1.0)))
+Print("ATanDeg(1)      = " + StrF(ATanDeg(1.0)))
+Print("ATan2Deg(1, 1)  = " + StrF(ATan2Deg(1.0, 1.0)))

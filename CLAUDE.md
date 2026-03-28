@@ -16,9 +16,10 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Integer division | `Int / Int` truncates to `Int` |
 | `=` vs `==` | `=` is always assignment; `==` is always equality |
 | Variable scoping | Top-level variables are **global** (readable and writable from any function); variables declared inside a function are local to that function |
-| Standard library | A bundled `core` module (auto-imported) provides `Print`, `Str`, `StrF`, `Val`, `ValF` |
+| Standard library | A bundled `core` module (auto-imported) provides math, string, and file I/O functions |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
+| Node.js module mode | Compiled output uses `require` for file I/O; must run in a CJS context (no `"type": "module"` in the nearest `package.json`). The `examples/` directory ships a `{"type":"commonjs"}` package.json for this reason. |
 | Library distribution | Installable directly from GitHub via `npm install github:JaviCervera/neobasic`; `prepare` script builds `dist/` automatically |
 
 ## Architecture

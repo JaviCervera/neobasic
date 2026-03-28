@@ -5,26 +5,26 @@
 // ---------------------------------------------------------------------------
 
 const _isNode = typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
+// Capture require at init time so it works in both CJS and when injected
+// via new Function('require', ...) in tests. In ESM contexts where require
+// is unavailable, _nodeRequire is null and file I/O degrades gracefully.
+const _nodeRequire = typeof require !== 'undefined' ? require : null;
 
 // ---------------------------------------------------------------------------
 // IO
 // ---------------------------------------------------------------------------
 
 function loadString(filename) {
-  if (_isNode) {
+  if (_isNode && _nodeRequire) {
     try {
-      const fs = require('fs');
-      try {
-        return fs.readFileSync(filename, 'utf8');
-      } catch (_e) {
-        return '';
-      }
+      return _nodeRequire('fs').readFileSync(filename, 'utf8');
     } catch (_e) {
       return '';
     }
-  } else {
+  } else if (!_isNode) {
     return localStorage.getItem(filename) ?? '';
   }
+  return '';
 }
 
 function print(message) {
@@ -32,10 +32,10 @@ function print(message) {
 }
 
 function saveString(filename, str, append) {
-  if (_isNode) {
+  if (_isNode && _nodeRequire) {
     try {
-      const fs = require('fs');
-      if (append !== 0) {
+      const fs = _nodeRequire('fs');
+      if (append) {
         fs.appendFileSync(filename, str, 'utf8');
       } else {
         fs.writeFileSync(filename, str, 'utf8');
@@ -43,8 +43,8 @@ function saveString(filename, str, append) {
     } catch (_e) {
       // silently no-op
     }
-  } else {
-    if (append !== 0) {
+  } else if (!_isNode) {
+    if (append) {
       const existing = localStorage.getItem(filename) ?? '';
       localStorage.setItem(filename, existing + str);
     } else {

@@ -401,19 +401,19 @@ describe("IO", () => {
   });
 
   it("SaveString writes a file (overwrite)", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", 0)`, []);
+    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("hello");
   });
 
   it("SaveString appends to a file", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", 0)`, []);
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", " world", 1)`, []);
+    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
+    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", " world", True)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("hello world");
   });
 
   it("SaveString overwrites existing content", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "first", 0)`, []);
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "second", 0)`, []);
+    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "first", False)`, []);
+    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "second", False)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("second");
   });
 

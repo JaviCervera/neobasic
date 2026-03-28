@@ -1,7 +1,7 @@
 'IO
 Function LoadString(filename As String) As String = "loadString"
 Function Print(message As String) = "print"
-Function SaveString(filename As String, str As String, append As Int) = "saveString"
+Function SaveString(filename As String, str As String, append As Bool) = "saveString"
 
 'Math
 Function Abs(x As Float) As Float = "abs"

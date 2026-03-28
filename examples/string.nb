@@ -1,0 +1,68 @@
+Print("=== String Functions ===")
+Print("")
+
+' --- Basic inspection ---
+Print("-- Length & Case --")
+greeting = "Hello, World!"
+Print("String:         " + greeting)
+Print("Len:            " + Str(Len(greeting)))
+Print("Upper:          " + Upper(greeting))
+Print("Lower:          " + Lower(greeting))
+Print("")
+
+' --- Substrings ---
+Print("-- Substrings --")
+s = "NeoBasic"
+Print("String:         " + s)
+Print("Left(4):        " + Left(s, 4))
+Print("Right(5):       " + Right(s, 5))
+Print("Mid(3, 4):      " + Mid(s, 3, 4))
+Print("")
+
+' --- Search & replace ---
+Print("-- Find & Replace --")
+sentence = "the cat sat on the mat"
+Print("String:              " + sentence)
+Print("Find('cat', 0):      " + Str(Find(sentence, "cat", 0)))
+Print("Find('xyz', 0):      " + Str(Find(sentence, "xyz", 0)))
+Print("Replace('at','og'):  " + Replace(sentence, "at", "og"))
+Print("Trim('  hello  '):   " + Trim("  hello  "))
+Print("")
+
+' --- Split & join ---
+Print("-- Split & Join --")
+csv = "apple,banana,cherry"
+Print("CSV string: " + csv)
+parts = Split(csv, ",")
+Print("parts[0]:   " + parts[0])
+Print("parts[1]:   " + parts[1])
+Print("parts[2]:   " + parts[2])
+rejoined = Join(parts, " | ")
+Print("Joined:     " + rejoined)
+Print("")
+
+' --- Filename helpers ---
+Print("-- Filename Helpers --")
+filepath = "images/icons/logo.png"
+Print("Path:       " + filepath)
+Print("StripDir:   " + StripDir(filepath))
+Print("StripExt:   " + StripExt(filepath))
+Print("ExtractDir: " + ExtractDir(filepath))
+Print("ExtractExt: " + ExtractExt(filepath))
+Print("")
+
+' --- Character codes ---
+Print("-- Character Codes --")
+Print("Asc('A', 0): " + Str(Asc("A", 0)))
+Print("Chr(65):     " + Chr(65))
+Print("Chr(9829):   " + Chr(9829))
+Print("")
+
+' --- File I/O ---
+Print("-- File I/O --")
+SaveString("notes.txt", "First line" + Chr(10), False)
+SaveString("notes.txt", "Second line" + Chr(10), True)
+SaveString("notes.txt", "Third line" + Chr(10), True)
+content = LoadString("notes.txt")
+Print("Saved and loaded notes.txt:")
+Print(content)

@@ -58,12 +58,17 @@ Then run the output with Node:
 node myprogram.js
 ```
 
-### Run the Hello World example
+> **Node.js module mode:** compiled programs use `require` for file I/O (`LoadString` / `SaveString`). Run them in a CommonJS context — either in a directory with no `package.json`, or in one that has `"type": "commonjs"`. If the nearest `package.json` has `"type": "module"`, file I/O will silently no-op.
+
+### Run the examples
 
 ```bash
-node dist/cli.js compile examples/hello.nb
-node examples/hello.js
+node dist/cli.js compile examples/hello.nb && node examples/hello.js
+node dist/cli.js compile examples/math.nb  && node examples/math.js
+node dist/cli.js compile examples/string.nb && node examples/string.js
 ```
+
+The `examples/` directory already contains a `{ "type": "commonjs" }` package.json so file I/O works out of the box.
 
 ### Global installation (optional)
 
@@ -639,7 +644,7 @@ All string indices and offsets are **0-based**.
 | Function | Signature | Description |
 |---|---|---|
 | `LoadString` | `(filename As String) As String` | Read a file as a string; returns `""` on error |
-| `SaveString` | `(filename As String, str As String, append As Int)` | Write `str` to a file; if `append` is non-zero, appends instead of overwriting |
+| `SaveString` | `(filename As String, str As String, append As Bool)` | Write `str` to a file; if `append` is `True`, appends instead of overwriting |
 
 In **Node.js**, these use the file system (`fs.readFileSync` / `fs.writeFileSync` / `fs.appendFileSync`). In the **browser**, the `filename` argument is used as a `localStorage` key.
 
