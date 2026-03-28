@@ -752,6 +752,51 @@ CloseWindow()
 >
 > This downloads raylib 5.0 source, compiles it to WebAssembly, and assembles the final `raylib.js`.
 
+### Running Raylib programs with nbqjs (native desktop, no browser)
+
+`dist/nbqjs.exe` is a custom QuickJS binary with Raylib statically linked. It lets you run compiled NeoBasic Raylib programs directly on the desktop without a browser or WASM loader.
+
+**Build nbqjs** (requires MinGW-w64 on Windows, or GCC on Linux/macOS):
+
+```bat
+# Windows
+neo_mods\raylib\build\build_nbqjs.bat
+```
+
+```bash
+# Linux / macOS / MSYS2
+bash neo_mods/raylib/build/build_nbqjs.sh
+```
+
+Produces `dist/nbqjs.exe` (Windows) or `dist/nbqjs` (Unix).
+
+**Requirements:**
+- Raylib 5.0 source at `lib/raylib-5.0/`
+- QuickJS source at `lib/quickjs-2025-09-13/`
+- MinGW-w64 (Windows) or system GCC (Linux/macOS)
+
+**Compile and run a Raylib program:**
+
+```bash
+# 1. Compile .nb to .js using the NeoBasic compiler
+node dist/cli.js compile examples/raylib-hello.nb -o raylib-hello.js
+# or with the QJS bundle:
+qjs dist/neobasic-qjs.js compile examples/raylib-hello.nb
+
+# 2. Run with nbqjs
+dist\nbqjs.exe raylib-hello.js          # Windows
+./dist/nbqjs raylib-hello.js             # Linux / macOS
+```
+
+The `raylib.js` module automatically detects nbqjs at runtime and uses the native C module (`raylib_native`) instead of the WASM path. The same compiled `.js` file runs in the browser (WASM) or on the desktop (nbqjs) without modification.
+
+**Rebuilding the QJS C module** (after changing `raylib_bridge.c`):
+
+```bash
+python neo_mods/raylib/build/gen_qjs_module.py
+# then re-run the build script
+```
+
 ## License
 
 See [LICENSE](LICENSE).

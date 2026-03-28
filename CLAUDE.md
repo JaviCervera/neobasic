@@ -497,6 +497,79 @@ npm run bundle:qjs
 qjs dist/neobasic-qjs.js compile myprogram.nb
 ```
 
+### Phase 12 — nbqjs: QuickJS with Native Raylib
+
+**Goal:** Provide a custom QuickJS binary (`dist/nbqjs.exe`) with Raylib statically linked as a built-in module, so compiled NeoBasic programs can use Raylib natively on the desktop without WASM or a browser.
+
+#### Architecture
+
+- **`dist/nbqjs.exe`** — custom QuickJS binary with Raylib statically linked in. Registers `"raylib_native"` as a built-in module before any script runs.
+- **`neo_mods/raylib/raylib.js`** — detects QuickJS at runtime via `globalThis.scriptArgs` and branches to use the native C module; falls back to the WASM path for browser/Node.
+- The compiled NeoBasic output is unchanged — the QJS detection lives entirely in `raylib.js`.
+
+#### New Files
+
+| File | Purpose |
+|---|---|
+| `neo_mods/raylib/build/nbqjs_main.c` | Custom QuickJS entry point; calls `js_init_module_raylib(ctx, "raylib_native")` in the context constructor |
+| `neo_mods/raylib/build/gen_qjs_module.py` | Python generator that reads `raylib_bridge.c` and emits `raylib_qjs_module.c` |
+| `neo_mods/raylib/build/raylib_qjs_module.c` | **AUTO-GENERATED** — 276 QJS C wrapper functions for all bridge/color/text-helper functions |
+| `neo_mods/raylib/build/emscripten.h` | Minimal stub so `raylib_bridge.c` compiles without the Emscripten toolchain |
+| `neo_mods/raylib/build/qjsc_stubs.c` | Stub `qjsc_repl[]` and `qjsc_repl_size` so nbqjs links without the full qjsc toolchain |
+| `neo_mods/raylib/build/build_nbqjs.bat` | Windows batch build script (MinGW) |
+| `neo_mods/raylib/build/build_nbqjs.sh` | Linux/macOS/MSYS2 bash build script |
+
+#### Build Requirements
+
+- **Raylib source** must be present at `lib/raylib-5.0/` (standard Raylib 5.0 directory).
+- **QuickJS source** must be present at `lib/quickjs-2025-09-13/`.
+- **Windows:** MinGW-w64 gcc on PATH (or `C:\mingw32\bin\gcc.exe`). No MSVC needed.
+- **Linux/macOS:** System gcc + X11/OpenGL dev packages.
+- No Emscripten required — the WASM build and nbqjs build are independent.
+
+#### Build Steps
+
+```sh
+# Windows (from repo root)
+neo_mods\raylib\build\build_nbqjs.bat
+
+# Linux / macOS / MSYS2
+bash neo_mods/raylib/build/build_nbqjs.sh
+```
+
+Produces `dist/nbqjs.exe` (Windows) or `dist/nbqjs` (Unix).
+
+If `raylib_qjs_module.c` is missing, the build scripts regenerate it automatically via `python gen_qjs_module.py`.
+
+#### QJS Detection in raylib.js
+
+```js
+const __RAYLIB_IS_QJS = (typeof globalThis.scriptArgs !== 'undefined') &&
+                        (typeof globalThis.process    === 'undefined') &&
+                        (typeof globalThis.window     === 'undefined');
+if (__RAYLIB_IS_QJS) {
+  const __native = await import('raylib_native');
+  for (const k of Object.getOwnPropertyNames(__native)) {
+    if (k !== '__esModule') module.exports[k] = __native[k];
+  }
+} else {
+  // ... existing WASM path ...
+}
+```
+
+#### Usage
+
+```sh
+# 1. Compile your NeoBasic program to JS (using standard neobasic CLI or neobasic-qjs.js)
+node dist/cli.js compile myprogram.nb -o myprogram.js
+# or:
+qjs dist/neobasic-qjs.js compile myprogram.nb
+
+# 2. Run with nbqjs
+dist\nbqjs.exe myprogram.js        # Windows
+./dist/nbqjs myprogram.js           # Linux/macOS
+```
+
 ## Bundled modules
 
 ### `core`
@@ -588,3 +661,71 @@ See Phase 9 for full implementation details.
 - Source maps
 - REPL
 - Watch mode
+
+<!--
+## Design Decisions with Alternative Choices (Phase 12 — nbqjs / Native Raylib)
+
+The following decisions were made when implementing the nbqjs native Raylib module.
+Each has a reasonable alternative. Review these if you want to change direction.
+
+### 1. Static linking vs. DLL / shared library
+**Chosen:** Raylib and the QJS C module are statically linked into `nbqjs.exe`.
+**Alternative:** Compile `raylib_qjs_module.dll` (Windows) / `.so` (Linux) separately.
+  Users copy the DLL alongside their compiled `.js` files and call `import('raylib_qjs_module.dll')`.
+  This is what the original RAYLIB-QJS-PLAN.md described.
+**Why static was chosen:** No deployment complexity — single executable, no DLL path issues.
+**Downside of static:** nbqjs.exe is ~2.8MB. Users who don't use Raylib still carry the weight.
+  A DLL approach would let `nbqjs` remain small and load Raylib on demand.
+
+### 2. 32-bit MinGW (i686) vs. 64-bit MinGW-w64
+**Chosen:** 32-bit MinGW (i686 GCC 8.1.0) because it was the only compiler available on this machine.
+**Alternative:** 64-bit MinGW-w64 (x86_64), which is the standard for modern Windows apps.
+  Install via: `winget install -e --id MSYS2.MSYS2` → `pacman -S mingw-w64-x86_64-gcc`.
+  The build scripts already detect MSYS2 at `C:\msys64\mingw64\bin\gcc.exe`.
+**Why 64-bit is preferred:** Raylib is a game engine; 64-bit gives access to more RAM, better
+  performance, and is required by some third-party libraries.
+**Impact:** 32-bit nbqjs.exe is limited to 4GB address space. For typical games this is fine.
+
+### 3. Built-in module name: "raylib_native" vs. "raylib"
+**Chosen:** `"raylib_native"` to avoid conflict with the NeoBasic module loader's
+  own `"raylib"` name (which maps to `neo_mods/raylib/raylib.js`).
+**Alternative:** Name it `"raylib"` and skip the JS wrapper file entirely when nbqjs is used.
+  This would require either: (a) a different module resolution in `nbqjs_main.c`,
+  or (b) teaching the NeoBasic compiler to emit a different import when targeting QJS.
+**Why "raylib_native" was chosen:** Minimal changes to the compiler and module system.
+
+### 4. WASM blob still present in QJS-compiled output
+**Chosen:** The compiled `.js` output includes the full WASM blob (~940KB) in the `else` branch
+  of `__RAYLIB_IS_QJS`. It is never executed on QJS, but it's present.
+**Alternative:** The NeoBasic codegen could detect `import "raylib"` + QJS target and
+  emit a stripped version of raylib.js without the WASM blob.
+  This would require a `--target qjs` CLI flag and split module files.
+**Why current approach was chosen:** Simplest — no compiler changes needed. The WASM blob
+  is inert string data in QJS and does not affect execution.
+**Downside:** QJS-compiled programs with raylib are ~950KB even though only ~50KB runs.
+
+### 5. Code generation: Python script vs. manual C file vs. background agent
+**Chosen:** Python generator (`gen_qjs_module.py`) that parses `raylib_bridge.c` and
+  emits `raylib_qjs_module.c`.
+**Alternative A:** Hand-write the 2500+ line C file.
+**Alternative B:** Use a background AI agent (was attempted but slow/uncertain).
+**Why generator was chosen:** Maintainable — if bridge.c changes, re-run the generator.
+  The parser handles all patterns (void/int/float/const char*/float*) correctly.
+
+### 6. `#include "raylib_bridge.c"` in QJS module
+**Chosen:** `raylib_qjs_module.c` includes `raylib_bridge.c` verbatim (with
+  `EMSCRIPTEN_KEEPALIVE` stripped), reusing the handle table and bridge functions.
+**Alternative:** Copy the handle table separately and call Raylib directly from QJS
+  wrappers without the bridge intermediary.
+**Why include was chosen:** Avoids duplicating ~800 lines of handle management code.
+  The bridge functions already do the right thing for native builds.
+
+### 7. QuickJS detection heuristic
+**Chosen:** `typeof globalThis.scriptArgs !== 'undefined' && typeof globalThis.process === 'undefined' && typeof globalThis.window === 'undefined'`.
+**Alternative:** Use a compile-time flag in the NeoBasic compiler to emit `const __QJS = true;`
+  when targeting nbqjs.
+**Why runtime detection was chosen:** Works without any compiler changes.
+  The heuristic is reliable: `scriptArgs` is set by QuickJS's `js_std_add_helpers`,
+  `process` is not present in stock QJS, and `window` is not present outside browsers.
+-->
+

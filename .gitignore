@@ -150,3 +150,6 @@ examples/notes.txt
 # Raylib WASM build artifacts
 neo_mods/raylib/build/raylib-*/
 neo_mods/raylib/build/output/
+
+# Compiled native object files
+*.o
