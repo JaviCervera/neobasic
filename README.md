@@ -125,6 +125,16 @@ import { compile } from 'neobasic';
 const { js, env } = compile('myprogram.nb');
 ```
 
+### Bundling as a single redistributable file
+
+If you need a single, minified `neobasic.js` for Node.js distribution or embedding, use [tsup](https://tsup.egoist.dev):
+
+```bash
+npx tsup src/compiler.ts --minify --platform node --out-dir dist
+```
+
+This produces `dist/neobasic.js` — a self-contained, minified bundle with all dependencies inlined. No prior `npm run build` step is required; tsup handles TypeScript transpilation itself.
+
 ### Running each compiler phase individually
 
 All pipeline stages are exported so you can run them independently:
