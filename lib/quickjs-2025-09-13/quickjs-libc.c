@@ -47,6 +47,17 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 
+
+#if defined(__linux__)
+    #ifndef _GNU_SOURCE
+        #define _GNU_SOURCE
+    #endif
+    #include <unistd.h>
+    #include <signal.h>
+    extern char **environ;
+    typedef void (*sighandler_t)(int);
+#endif
+
 #if defined(__FreeBSD__)
 extern char **environ;
 #endif
