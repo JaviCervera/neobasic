@@ -8,7 +8,7 @@ REM    Raylib   — ../../../lib/raylib-5.0/src/
 REM    Module   — . (this directory)
 REM ================================================================
 
-setlocal EnableExtensions
+setlocal EnableDelayedExpansion EnableExtensions
 
 REM ── locate gcc ──────────────────────────────────────────────────
 where gcc >nul 2>&1
@@ -16,10 +16,10 @@ if %errorlevel% == 0 (
     set GCC=gcc
 ) else if exist "C:\mingw32\bin\gcc.exe" (
     set GCC=C:\mingw32\bin\gcc.exe
-    set PATH=C:\mingw32\bin;%PATH%
+    set PATH=C:\mingw32\bin;!PATH!
 ) else if exist "C:\msys64\mingw64\bin\gcc.exe" (
     set GCC=C:\msys64\mingw64\bin\gcc.exe
-    set PATH=C:\msys64\mingw64\bin;%PATH%
+    set PATH=C:\msys64\mingw64\bin;!PATH!
 ) else (
     echo ERROR: gcc not found. Install MinGW (https://www.mingw-w64.org/) and add it to PATH.
     exit /b 1
@@ -33,14 +33,12 @@ set QJS_DIR=%SCRIPT_DIR%..\..\..\lib\quickjs-2025-09-13
 set RL_SRC=%SCRIPT_DIR%..\..\..\lib\raylib-5.0\src
 set DIST=%SCRIPT_DIR%..\..\..\dist
 
-REM ── If raylib_qjs_module.c is missing, regenerate ───────────────
-if not exist "%SCRIPT_DIR%raylib_qjs_module.c" (
-    echo Generating raylib_qjs_module.c...
-    python "%SCRIPT_DIR%gen_qjs_module.py"
-    if %errorlevel% neq 0 (
-        echo ERROR: gen_qjs_module.py failed.  Install Python 3 and retry.
-        exit /b 1
-    )
+REM ── Always regenerate raylib_qjs_module.c from bridge ───────────
+echo Generating raylib_qjs_module.c...
+python "%SCRIPT_DIR%gen_qjs_module.py"
+if %errorlevel% neq 0 (
+    echo ERROR: gen_qjs_module.py failed.  Install Python 3 and retry.
+    exit /b 1
 )
 
 mkdir "%BUILD_DIR%" 2>nul

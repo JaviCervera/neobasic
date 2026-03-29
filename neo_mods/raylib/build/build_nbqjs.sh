@@ -25,11 +25,9 @@ GCC="${GCC:-gcc}"
 command -v "$GCC" >/dev/null 2>&1 || { echo "ERROR: gcc not found."; exit 1; }
 echo "Using compiler: $($GCC --version | head -1)"
 
-# ── generate QJS module if missing ──────────────────────────────
-if [ ! -f "$SCRIPT_DIR/raylib_qjs_module.c" ]; then
-    echo "Generating raylib_qjs_module.c..."
-    python3 "$SCRIPT_DIR/gen_qjs_module.py"
-fi
+# ── always regenerate QJS module ────────────────────────────────
+echo "Generating raylib_qjs_module.c..."
+python3 "$SCRIPT_DIR/gen_qjs_module.py"
 
 mkdir -p "$BUILD_DIR" "$DIST"
 
