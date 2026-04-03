@@ -56,7 +56,7 @@ echo "=== [2/2] Building neobasic ==="
 need gcc     "Install gcc (Linux: build-essential; macOS: xcode-select --install)"
 need python3 "Install Python 3 (https://python.org/)"
 
-BUILD_NBQJS="$SCRIPT_DIR/neo_mods/raylib/build/build_nbqjs.sh"
+BUILD_NBQJS="$SCRIPT_DIR/interpreter/build.sh"
 if [ ! -f "$BUILD_NBQJS" ]; then
     echo "ERROR: $BUILD_NBQJS not found."
     exit 1

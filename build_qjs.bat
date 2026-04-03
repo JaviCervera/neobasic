@@ -54,7 +54,7 @@ REM ── Step 2: build neobasic.exe ──────────────
 echo.
 echo === [2/2] Building neobasic.exe ===
 
-set BUILD_NBQJS=%SCRIPT_DIR%neo_mods\raylib\build\build_nbqjs.bat
+set BUILD_NBQJS=%SCRIPT_DIR%interpreter\build.bat
 if not exist "%BUILD_NBQJS%" (
     echo ERROR: %BUILD_NBQJS% not found.
     exit /b 1

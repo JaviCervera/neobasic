@@ -642,7 +642,7 @@ neobasic -r raylib-hello.js
 **Rebuilding the native C module** (after changing `raylib_bridge.c`):
 
 ```bash
-python neo_mods/raylib/build/gen_qjs_module.py
+python interpreter/gen_qjs_module.py
 # then re-run build_qjs.sh / build_qjs.bat
 ```
 

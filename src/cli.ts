@@ -68,8 +68,9 @@ function main(): void {
     const result = compile(inputFile!);
     // --emit: hand code back to the C host via a registered global function
     // (used by `neobasic -r file.nb` to compile in memory without writing a file)
-    if (emitToGlobal && typeof (globalThis as any).__neobasic_emit === "function") {
-      (globalThis as any).__neobasic_emit(result.js);
+    const g = globalThis as Record<string, unknown>;
+    if (emitToGlobal && typeof g.__neobasic_emit === "function") {
+      (g.__neobasic_emit as (code: string) => void)(result.js);
     } else {
       fs.writeFileSync(outputFile!, result.js, "utf-8");
       console.log(`Compiled ${inputFile} -> ${outputFile}`);

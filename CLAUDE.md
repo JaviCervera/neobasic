@@ -4,6 +4,7 @@
 
 - **`CLAUDE.md` must always be kept up to date.** Whenever a design decision changes, a new phase is completed, a module is added or modified, or any architectural detail shifts, update the relevant section of this file before considering the work done.
 - **`README.md` must always be kept up to date.** Any user-facing change — new functions, new CLI flags, new install steps, changed behaviour — must be reflected in `README.md` as part of the same change.
+- **`npm run lint` must pass after every code change.** Run it before considering any TypeScript change done. Fix all errors before committing.
 
 ## Summary
 
@@ -521,13 +522,13 @@ qjs dist/neobasic.js -c myprogram.nb
 
 | File | Purpose |
 |---|---|
-| `neo_mods/raylib/build/nbqjs_main.c` | Custom QuickJS entry point; registers `raylib_native`; implements `-c`/`-r`/default CLI modes; `-r .nb` uses `__neobasic_emit` to compile in memory |
-| `neo_mods/raylib/build/gen_qjs_module.py` | Python generator that reads `raylib_bridge.c` and emits `raylib_qjs_module.c` |
-| `neo_mods/raylib/build/raylib_qjs_module.c` | **AUTO-GENERATED** — 276 QJS C wrapper functions for all bridge/color/text-helper functions |
-| `neo_mods/raylib/build/emscripten.h` | Minimal stub so `raylib_bridge.c` compiles without the Emscripten toolchain |
-| `neo_mods/raylib/build/qjsc_stubs.c` | Stub `qjsc_repl[]` and `qjsc_repl_size` so neobasic links without the full qjsc toolchain |
-| `neo_mods/raylib/build/build_nbqjs.bat` | Windows batch build script (MinGW) |
-| `neo_mods/raylib/build/build_nbqjs.sh` | Linux/macOS/MSYS2 bash build script |
+| `interpreter/neobasic.c` | Custom QuickJS entry point; registers `raylib_native`; implements `-c`/`-r`/default CLI modes; `-r .nb` uses `__neobasic_emit` to compile in memory |
+| `interpreter/gen_qjs_module.py` | Python generator that reads `raylib_bridge.c` and emits `raylib_qjs_module.c` |
+| `interpreter/raylib_qjs_module.c` | **AUTO-GENERATED** — 276 QJS C wrapper functions for all bridge/color/text-helper functions |
+| `interpreter/emscripten.h` | Minimal stub so `raylib_bridge.c` compiles without the Emscripten toolchain |
+| `interpreter/qjsc_stubs.c` | Stub `qjsc_repl[]` and `qjsc_repl_size` so neobasic links without the full qjsc toolchain |
+| `interpreter/build.bat` | Windows batch build script (MinGW) |
+| `interpreter/build.sh` | Linux/macOS/MSYS2 bash build script |
 
 #### Build Requirements
 
@@ -541,10 +542,10 @@ qjs dist/neobasic.js -c myprogram.nb
 
 ```sh
 # Windows (from repo root)
-neo_mods\raylib\build\build_nbqjs.bat
+interpreter\build.bat
 
 # Linux / macOS / MSYS2
-bash neo_mods/raylib/build/build_nbqjs.sh
+bash interpreter/build.sh
 ```
 
 Produces `dist/neobasic.exe` (Windows) or `dist/neobasic` (Unix).
@@ -699,8 +700,8 @@ Each has a reasonable alternative. Review these if you want to change direction.
 ### 3. Built-in module name: "raylib_native" vs. "raylib"
 **Chosen:** `"raylib_native"` to avoid conflict with the NeoBasic module loader's
   own `"raylib"` name (which maps to `neo_mods/raylib/raylib.js`).
-**Alternative:** Name it `"raylib"` and skip the JS wrapper file entirely when nbqjs is used.
-  This would require either: (a) a different module resolution in `nbqjs_main.c`,
+**Alternative:** Name it `"raylib"` and skip the JS wrapper file entirely when neobasic is used.
+  This would require either: (a) a different module resolution in `interpreter/neobasic.c`,
   or (b) teaching the NeoBasic compiler to emit a different import when targeting QJS.
 **Why "raylib_native" was chosen:** Minimal changes to the compiler and module system.
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # =================================================================
-# build_nbqjs.sh  --  Build nbqjs (NeoBasic QuickJS + Raylib native)
+# build.sh  --  Build neobasic (NeoBasic QuickJS + Raylib native)
 # Works on Linux, macOS, and MSYS2/MINGW64 on Windows.
 #
 # Sources:
 #   QuickJS  -- lib/quickjs-2025-09-13/
 #   Raylib   -- lib/raylib-5.0/src/
-#   Module   -- neo_mods/raylib/build/ (this directory)
+#   Interpreter -- interpreter/ (this directory)
 #
 # Prerequisites:
 #   Linux/macOS : gcc, libX11-dev, libXrandr-dev, libXinerama-dev,
@@ -16,9 +16,9 @@
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/obj"
-QJS_DIR="$SCRIPT_DIR/../../../lib/quickjs-2025-09-13"
-RL_SRC="$SCRIPT_DIR/../../../lib/raylib-5.0/src"
-DIST="$SCRIPT_DIR/../../../dist"
+QJS_DIR="$SCRIPT_DIR/../lib/quickjs-2025-09-13"
+RL_SRC="$SCRIPT_DIR/../lib/raylib-5.0/src"
+DIST="$SCRIPT_DIR/../dist"
 
 # ── locate compiler ─────────────────────────────────────────────
 GCC="${GCC:-gcc}"
@@ -85,8 +85,8 @@ done
 echo "[3/5] Compiling raylib QJS module..."
 eval "$GCC $CFLAGS -c $SCRIPT_DIR/raylib_qjs_module.c -o $BUILD_DIR/raylib_qjs_module.o"
 
-echo "[4/5] Compiling nbqjs_main.c..."
-eval "$GCC $CFLAGS -c $SCRIPT_DIR/nbqjs_main.c -o $BUILD_DIR/nbqjs_main.o"
+echo "[4/5] Compiling neobasic.c..."
+eval "$GCC $CFLAGS -c $SCRIPT_DIR/neobasic.c -o $BUILD_DIR/neobasic.o"
 
 echo "[4b] Compiling qjsc_stubs.c..."
 eval "$GCC $CFLAGS -c $SCRIPT_DIR/qjsc_stubs.c -o $BUILD_DIR/qjsc_stubs.o"
@@ -94,7 +94,7 @@ eval "$GCC $CFLAGS -c $SCRIPT_DIR/qjsc_stubs.c -o $BUILD_DIR/qjsc_stubs.o"
 # ── Step 4: link ─────────────────────────────────────────────────
 echo "[5/5] Linking neobasic$EXE_EXT..."
 eval "$GCC -o $DIST/neobasic$EXE_EXT \
-    $BUILD_DIR/nbqjs_main.o \
+    $BUILD_DIR/neobasic.o \
     $BUILD_DIR/raylib_qjs_module.o \
     $BUILD_DIR/quickjs.o $BUILD_DIR/dtoa.o \
     $BUILD_DIR/libregexp.o $BUILD_DIR/libunicode.o \

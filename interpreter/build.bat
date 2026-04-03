@@ -1,11 +1,11 @@
 @echo off
 REM ================================================================
-REM  build_nbqjs.bat  —  Build nbqjs.exe (NeoBasic QuickJS with Raylib)
+REM  build.bat  —  Build neobasic.exe (NeoBasic QuickJS with Raylib)
 REM  Requires: MinGW-w64 gcc on PATH  (or 32-bit MinGW at C:\mingw32\bin)
 REM  Sources:
-REM    QuickJS  — ../../../lib/quickjs-2025-09-13/
-REM    Raylib   — ../../../lib/raylib-5.0/src/
-REM    Module   — . (this directory)
+REM    QuickJS  — ..\lib\quickjs-2025-09-13\
+REM    Raylib   — ..\lib\raylib-5.0\src\
+REM    Interpreter — . (this directory)
 REM ================================================================
 
 setlocal EnableDelayedExpansion EnableExtensions
@@ -29,9 +29,9 @@ echo Using compiler: %GCC%
 REM ── paths ───────────────────────────────────────────────────────
 set SCRIPT_DIR=%~dp0
 set BUILD_DIR=%SCRIPT_DIR%obj
-set QJS_DIR=%SCRIPT_DIR%..\..\..\lib\quickjs-2025-09-13
-set RL_SRC=%SCRIPT_DIR%..\..\..\lib\raylib-5.0\src
-set DIST=%SCRIPT_DIR%..\..\..\dist
+set QJS_DIR=%SCRIPT_DIR%..\lib\quickjs-2025-09-13
+set RL_SRC=%SCRIPT_DIR%..\lib\raylib-5.0\src
+set DIST=%SCRIPT_DIR%..\dist
 
 REM ── Always regenerate raylib_qjs_module.c from bridge ───────────
 echo Generating raylib_qjs_module.c...
@@ -72,8 +72,8 @@ REM raylib_qjs_module.c includes raylib_bridge.c via #include, so compile as one
 "%GCC%" %CFLAGS% -c "%SCRIPT_DIR%raylib_qjs_module.c" -o "%BUILD_DIR%\raylib_qjs_module.o"
 if %errorlevel% neq 0 exit /b 1
 
-echo [4/5] Compiling nbqjs_main.c...
-"%GCC%" %CFLAGS% -c "%SCRIPT_DIR%nbqjs_main.c" -o "%BUILD_DIR%\nbqjs_main.o"
+echo [4/5] Compiling neobasic.c...
+"%GCC%" %CFLAGS% -c "%SCRIPT_DIR%neobasic.c" -o "%BUILD_DIR%\neobasic.o"
 if %errorlevel% neq 0 exit /b 1
 
 echo [4b] Compiling qjsc_stubs.c...
@@ -83,7 +83,7 @@ if %errorlevel% neq 0 exit /b 1
 REM ── Step 4: link ────────────────────────────────────────────────
 echo [5/5] Linking neobasic.exe...
 "%GCC%" -o "%DIST%\neobasic.exe" ^
-    "%BUILD_DIR%\nbqjs_main.o" ^
+    "%BUILD_DIR%\neobasic.o" ^
     "%BUILD_DIR%\raylib_qjs_module.o" ^
     "%BUILD_DIR%\quickjs.o" "%BUILD_DIR%\dtoa.o" ^
     "%BUILD_DIR%\libregexp.o" "%BUILD_DIR%\libunicode.o" ^
