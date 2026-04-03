@@ -1,52 +1,19 @@
 'use strict';
 
 // ---------------------------------------------------------------------------
-// Environment detection
-// ---------------------------------------------------------------------------
-
-const _isNode = typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
-// Capture require at init time so it works in both CJS and when injected
-// via new Function('require', ...) in tests. In ESM contexts where require
-// is unavailable, _nodeRequire is null and file I/O degrades gracefully.
-const _nodeRequire = typeof require !== 'undefined' ? require : null;
-// QuickJS: std/os are available as globals when run with `qjs --std`
-const _isQJS = !_isNode && typeof globalThis.std !== 'undefined' && typeof globalThis.std.open === 'function';
-
-// ---------------------------------------------------------------------------
-// IO
+// IO (QuickJS — globalThis.std is registered by the neobasic binary)
 // ---------------------------------------------------------------------------
 
 function loadString(filename) {
-  if (_isNode && _nodeRequire) {
-    try {
-      return _nodeRequire('fs').readFileSync(filename, 'utf8');
-    } catch (_e) {
-      return '';
-    }
-  } else if (_isQJS) {
-    return globalThis.std.loadFile(filename) ?? '';
-  } else {
-    return localStorage.getItem(filename) ?? '';
-  }
+  return globalThis.std.loadFile(filename) ?? '';
 }
 
 function input(prompt) {
-  if (_isNode && _nodeRequire) {
-    const fs = _nodeRequire('fs');
-    if (prompt) process.stdout.write(prompt);
-    const buf = Buffer.alloc(4096);
-    const n = fs.readSync(0, buf, 0, buf.length, null);
-    return buf.slice(0, n).toString('utf8').replace(/\r?\n$/, '');
-  } else if (_isQJS) {
-    if (prompt) {
-      globalThis.std.out.puts(prompt);
-      globalThis.std.out.flush();
-    }
-    return globalThis.std.in.getline() ?? '';
-  } else {
-    console.warn('Input() is not supported in the browser');
-    return '';
+  if (prompt) {
+    globalThis.std.out.puts(prompt);
+    globalThis.std.out.flush();
   }
+  return globalThis.std.in.getline() ?? '';
 }
 
 function print(message) {
@@ -54,31 +21,11 @@ function print(message) {
 }
 
 function saveString(filename, str, append) {
-  if (_isNode && _nodeRequire) {
-    try {
-      const fs = _nodeRequire('fs');
-      if (append) {
-        fs.appendFileSync(filename, str, 'utf8');
-      } else {
-        fs.writeFileSync(filename, str, 'utf8');
-      }
-    } catch (_e) {
-      // silently no-op
-    }
-  } else if (_isQJS) {
-    const existing = append ? (globalThis.std.loadFile(filename) ?? '') : '';
-    const f = globalThis.std.open(filename, 'w');
-    if (f) {
-      f.puts(existing + str);
-      f.close();
-    }
-  } else {
-    if (append) {
-      const existing = localStorage.getItem(filename) ?? '';
-      localStorage.setItem(filename, existing + str);
-    } else {
-      localStorage.setItem(filename, str);
-    }
+  const existing = append ? (globalThis.std.loadFile(filename) ?? '') : '';
+  const f = globalThis.std.open(filename, 'w');
+  if (f) {
+    f.puts(existing + str);
+    f.close();
   }
 }
 

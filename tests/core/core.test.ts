@@ -2,10 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { createRequire } from "node:module";
 import { compileSource } from "../../src/compiler.js";
-
-const nodeRequire = createRequire(import.meta.url);
 
 function run(source: string, vars: string[]): Record<string, unknown> {
   const js = compileSource(source);
@@ -13,10 +10,37 @@ function run(source: string, vars: string[]): Record<string, unknown> {
   return fn();
 }
 
-function runWithRequire(source: string, vars: string[]): Record<string, unknown> {
+/** Run with a mock globalThis.std so core.js IO functions work in Node test env */
+function runWithStd(source: string, vars: string[]): Record<string, unknown> {
+  const mockStd = {
+    loadFile: (filename: string) => {
+      try { return fs.readFileSync(filename, "utf8"); }
+      catch { return null; }
+    },
+    open: (_filename: string, _mode: string) => {
+      // Capture what gets written so we can flush on close
+      const filePath = _filename;
+      let buf = "";
+      return {
+        puts: (s: string) => { buf += s; },
+        close: () => { fs.writeFileSync(filePath, buf, "utf8"); },
+      };
+    },
+    out: { puts: () => {}, flush: () => {} },
+    in:  { getline: () => "" },
+  };
   const js = compileSource(source);
-  const fn = new Function("require", js + `\nreturn { ${vars.join(", ")} };`);
-  return fn(nodeRequire);
+  const fn = new Function("__mockStd", `
+    const _saved = globalThis.std;
+    globalThis.std = __mockStd;
+    try {
+      ${js}
+      return { ${vars.join(", ")} };
+    } finally {
+      globalThis.std = _saved;
+    }
+  `);
+  return fn(mockStd);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,30 +425,30 @@ describe("IO", () => {
   });
 
   it("SaveString writes a file (overwrite)", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
+    runWithStd(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("hello");
   });
 
   it("SaveString appends to a file", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", " world", True)`, []);
+    runWithStd(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "hello", False)`, []);
+    runWithStd(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", " world", True)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("hello world");
   });
 
   it("SaveString overwrites existing content", () => {
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "first", False)`, []);
-    runWithRequire(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "second", False)`, []);
+    runWithStd(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "first", False)`, []);
+    runWithStd(`SaveString("${tmpFile.replace(/\\/g, "\\\\")}", "second", False)`, []);
     expect(fs.readFileSync(tmpFile, "utf8")).toBe("second");
   });
 
   it("LoadString reads a file", () => {
     fs.writeFileSync(tmpFile, "content", "utf8");
-    const r = runWithRequire(`s = LoadString("${tmpFile.replace(/\\/g, "\\\\")}")`, ["s"]);
+    const r = runWithStd(`s = LoadString("${tmpFile.replace(/\\/g, "\\\\")}")`, ["s"]);
     expect(r.s).toBe("content");
   });
 
   it("LoadString returns empty string on missing file", () => {
-    const r = runWithRequire(`s = LoadString("nonexistent_file_abc123.txt")`, ["s"]);
+    const r = runWithStd(`s = LoadString("nonexistent_file_abc123.txt")`, ["s"]);
     expect(r.s).toBe("");
   });
 });

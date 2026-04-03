@@ -1,6 +1,6 @@
 # NeoBasic
 
-NeoBasic is a structured, BASIC-like programming language inspired by [BlitzBasic](https://en.wikipedia.org/wiki/Blitz_BASIC). It transpiles to JavaScript and can target both Node.js and web browsers.
+NeoBasic is a structured, BASIC-like programming language inspired by [BlitzBasic](https://en.wikipedia.org/wiki/Blitz_BASIC). It transpiles to JavaScript and runs via [QuickJS](https://bellard.org/quickjs/) through the `neobasic` binary.
 
 The compiler is written in idiomatic TypeScript (strict mode) and distributed as a CLI tool.
 
@@ -13,24 +13,31 @@ This project was built with [GitHub Copilot](https://github.com/features/copilot
 
 ## Requirements
 
-- **Node.js** ≥ 18
-- **npm** ≥ 9
+**To build the neobasic binary:**
+- **Node.js** ≥ 18 and **npm** ≥ 9 (compiler toolchain)
+- **GCC** (Linux/macOS) or **MinGW-w64** (Windows)
+- Raylib 5.0 source at `lib/raylib-5.0/`
+- QuickJS source at `lib/quickjs-2025-09-13/`
 
 ## Getting started
 
-### Install dependencies
+### Build everything
 
 ```bash
+# Linux / macOS
 npm install
+bash build_qjs.sh
 ```
 
-### Build the compiler
-
-```bash
-npm run build
+```bat
+REM Windows
+npm install
+build_qjs.bat
 ```
 
-This compiles the TypeScript source in `src/` to JavaScript in `dist/`.
+This produces two artefacts in `dist/`:
+- **`neobasic.js`** — the compiler CLI, runs under any QuickJS installation
+- **`neobasic`** / **`neobasic.exe`** — the full runtime binary (QuickJS + native Raylib)
 
 ### Run the tests
 
@@ -41,70 +48,28 @@ npm test
 ### Compile a NeoBasic program
 
 ```bash
-node dist/cli.js -c myprogram.nb
+neobasic -c myprogram.nb
 ```
 
-This produces a single self-contained `myprogram.js` in the same directory — all imported modules are inlined into the output, so you can copy it anywhere and run it without needing any companion files.
+This produces a single self-contained `myprogram.js` in the same directory — all imported modules are inlined into the output.
 
 You can specify a different output path with `-o`:
 
 ```bash
-node dist/cli.js -c myprogram.nb -o output/myprogram.js
+neobasic -c myprogram.nb -o output/myprogram.js
 ```
 
-Then run the output with Node:
+### Run a NeoBasic program
 
 ```bash
-node myprogram.js
+# Compile and run in one step (no .js file is written to disk)
+neobasic -r myprogram.nb
+
+# Run a previously compiled .js file
+neobasic -r myprogram.js
 ```
 
-> **Node.js module mode:** compiled programs use `require` for file I/O (`LoadString` / `SaveString`). Run them in a CommonJS context — either in a directory with no `package.json`, or in one that has `"type": "commonjs"`. If the nearest `package.json` has `"type": "module"`, file I/O will silently no-op.
-
-### Run the examples
-
-```bash
-node dist/cli.js -c examples/hello.nb  && node examples/hello.js
-node dist/cli.js -c examples/math.nb   && node examples/math.js
-node dist/cli.js -c examples/string.nb && node examples/string.js
-node dist/cli.js -c examples/input.nb  && node examples/input.js
-```
-
-The `examples/` directory already contains a `{ "type": "commonjs" }` package.json so file I/O works out of the box.
-
-### Global installation (optional)
-
-After building, you can link the CLI globally:
-
-```bash
-npm link
-neobasic -c myprogram.nb
-```
-
-### Using with QuickJS
-
-NeoBasic can also be compiled to a self-contained bundle that runs under [QuickJS](https://bellard.org/quickjs/):
-
-```bash
-npm run bundle:qjs
-```
-
-This produces `dist/neobasic.js` with all Node.js APIs shimmed for QuickJS. Use it as a drop-in CLI replacement:
-
-```bash
-qjs dist\neobasic.js -c examples\hello.nb
-```
-
-Then run the compiled output. For programs that use `LoadString` or `SaveString`, pass `--std` so QuickJS exposes its built-in `std` module for file I/O:
-
-```bash
-qjs --std examples\hello.js
-```
-
-Without `--std`, file I/O silently no-ops (same behaviour as running in a browser without `localStorage`).
-
-### Using the neobasic binary
-
-When built (see [Raylib section](#running-raylib-programs-with-neobasic-native-desktop-no-browser) for build instructions), the `neobasic` binary provides three modes:
+### neobasic binary modes
 
 | Command | Behaviour |
 |---|---|
@@ -113,116 +78,24 @@ When built (see [Raylib section](#running-raylib-programs-with-neobasic-native-d
 | `neobasic -r file.js` | Run a JavaScript file directly |
 | `neobasic [args...]` | Run `program.js` in the current directory, forwarding all args |
 
-## Using NeoBasic as a library
-
-NeoBasic can be used as a library in your own Node.js projects without being published to npm. Install it directly from GitHub:
+### Run the examples
 
 ```bash
-npm install github:JaviCervera/neobasic
+neobasic -r examples/hello.nb
+neobasic -r examples/math.nb
+neobasic -r examples/string.nb
 ```
 
-npm will automatically build the package during installation (via the `prepare` script), so no extra steps are required.
+### Using the compiler standalone (without building the binary)
 
-### High-level API
-
-The simplest way to compile NeoBasic source code from your application is with `compileSource`, which takes a source string and returns a JavaScript string:
-
-```javascript
-import { compileSource } from 'neobasic';
-
-const nbSource = `
-Print("Hello from NeoBasic!")
-`;
-
-const jsOutput = compileSource(nbSource);
-console.log(jsOutput);
-```
-
-If your program uses `Import` statements that refer to custom modules, pass the `cwd` option so the module loader can find them in `<cwd>/neo_mods/`:
-
-```javascript
-const jsOutput = compileSource(nbSource, { cwd: '/path/to/your/project' });
-```
-
-> **Module resolution:** the loader searches three locations in order:
-> 1. `<cwd>/neo_mods/` — project-local modules
-> 2. `~/neo_mods/` — user-global modules
-> 3. The `neo_mods/` directory bundled with the neobasic package — this always contains `core`, so the built-in library works out of the box without any configuration
->
-> `Include` statements are not supported when compiling from a string. Use the file-based `compile()` function instead if you need them.
-
-The `compile()` function compiles a `.nb` file on disk and additionally supports `Include` statements. It returns both the JavaScript output and the populated type-checker environment:
-
-```javascript
-import { compile } from 'neobasic';
-
-const { js, env } = compile('myprogram.nb');
-```
-
-### Bundling as a single redistributable file
-
-**Node.js bundle** — a single minified `neobasic.js` with all dependencies inlined:
+If you only need to compile `.nb` files and already have [QuickJS](https://bellard.org/quickjs/) installed:
 
 ```bash
-npm run bundle
+npm install
+npm run bundle:qjs   # produces dist/neobasic.js
+qjs dist/neobasic.js -c myprogram.nb
 ```
 
-Produces `dist/neobasic.js` (library API: exports `compileSource` and `compile`).
-
-**QuickJS bundle** — a self-contained CLI bundle with Node.js APIs shimmed for QuickJS:
-
-```bash
-npm run bundle:qjs
-```
-
-Produces `dist/neobasic.js`. No prior `npm run build` step is needed for either bundle; the bundler handles TypeScript transpilation itself.
-
-### Running each compiler phase individually
-
-All pipeline stages are exported so you can run them independently:
-
-```javascript
-import { lex } from 'neobasic/dist/lexer/index.js';
-import { parse } from 'neobasic/dist/parser/index.js';
-import { check } from 'neobasic/dist/checker/index.js';
-import { generate } from 'neobasic/dist/codegen/index.js';
-import { resolveModule } from 'neobasic/dist/modules/index.js';
-import * as fs from 'node:fs';
-
-const source = `
-a As Int = 21
-Print(Str(a * 2))
-`;
-
-// 1. Lex: source string → flat token stream
-const tokens = lex(source, '<myfile>');
-
-// 2. Parse: tokens → typed AST
-const program = parse(tokens, '<myfile>');
-
-// 3. Resolve modules and build the checker environment
-//    (core is always needed; add extra resolveModule calls for each Import)
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-const cwd = process.cwd();
-const coreModule = resolveModule('core', cwd);
-const moduleContents = new Map([[coreModule.name, fs.readFileSync(coreModule.jsPath, 'utf-8')]]);
-const env = {
-  funcs: new Map([...coreModule.funcs]),
-  vars:  new Map([...coreModule.consts].map(([k, v]) => [k, { type: v.type, isConst: true }])),
-  types: new Map([...coreModule.types]),
-};
-
-// 4. Type-check: annotates the AST with resolved types
-const checkResult = check(program, '<myfile>', env);
-
-// 5. Generate: annotated AST → JavaScript string
-const js = generate(program, checkResult, { moduleContents });
-
-console.log(js);
-```
-
----
 
 ## Architecture
 
@@ -699,7 +572,7 @@ All string indices and offsets are **0-based**.
 | `LoadString` | `(filename As String) As String` | Read a file as a string; returns `""` on error |
 | `SaveString` | `(filename As String, str As String, append As Bool)` | Write `str` to a file; if `append` is `True`, appends instead of overwriting |
 
-In **Node.js**, `Input` uses `fs.readSync` on stdin; `LoadString`/`SaveString` use the file system. In **QuickJS**, run with `qjs --std` to enable all I/O via `std.in.readline` / `std.loadFile` / `std.open`; without `--std`, I/O silently no-ops. In the **browser**, `Input` logs a warning and returns `""`; `LoadString`/`SaveString` use `localStorage`.
+All I/O uses the QuickJS `std` module registered by the `neobasic` binary: `Input` reads from `std.in`; `LoadString`/`SaveString` use `std.loadFile`/`std.open`.
 
 Example:
 
@@ -714,7 +587,7 @@ Print(Upper(words[0]))
 
 ### Raylib module
 
-NeoBasic includes a `raylib` module that provides bindings to the [Raylib](https://www.raylib.com/) game development library via WebAssembly. Import it with `Import "raylib"`.
+NeoBasic includes a `raylib` module that provides bindings to the [Raylib](https://www.raylib.com/) game development library. Import it with `Import "raylib"`. Requires the `neobasic` binary (Raylib is statically linked).
 
 The module exposes **27 types**, **383 functions**, and **250 constants** covering the full Raylib API:
 
@@ -755,57 +628,22 @@ EndWhile
 CloseWindow()
 ```
 
-> **Note:** The committed `raylib.js` includes the full WASM-backed implementation (pre-built, ~940 KB). To rebuild it from source (e.g. after modifying the C bridge or upgrading raylib), you need [Emscripten](https://emscripten.org/) installed, then run:
->
-> ```bash
-> cd neo_mods/raylib/build && bash build.sh
-> ```
->
-> This downloads raylib 5.0 source, compiles it to WebAssembly, and assembles the final `raylib.js`.
-
-### Running Raylib programs with neobasic (native desktop, no browser)
-
-`dist/neobasic.exe` is a custom QuickJS binary with Raylib statically linked. It lets you run compiled NeoBasic Raylib programs directly on the desktop without a browser or WASM loader.
-
-**Build neobasic** (requires MinGW-w64 on Windows, or GCC on Linux/macOS):
-
-```bat
-# Windows
-neo_mods\raylib\build\build_nbqjs.bat
-```
-
-```bash
-# Linux / macOS / MSYS2
-bash neo_mods/raylib/build/build_nbqjs.sh
-```
-
-Produces `dist/neobasic.exe` (Windows) or `dist/neobasic` (Unix).
-
-**Requirements:**
-- Raylib 5.0 source at `lib/raylib-5.0/`
-- QuickJS source at `lib/quickjs-2025-09-13/`
-- MinGW-w64 (Windows) or system GCC (Linux/macOS)
-
 **Compile and run a Raylib program:**
 
 ```bash
-# Compile and run in one step (no .js file written)
-dist\neobasic.exe -r examples/raylib-hello.nb    # Windows
-./dist/neobasic -r examples/raylib-hello.nb       # Linux / macOS
+# Compile and run in one step
+neobasic -r examples/raylib-hello.nb
 
 # Or compile first, then run the .js
-node dist/cli.js -c examples/raylib-hello.nb -o raylib-hello.js
-dist\neobasic.exe -r raylib-hello.js              # Windows
-./dist/neobasic -r raylib-hello.js                # Linux / macOS
+neobasic -c examples/raylib-hello.nb -o raylib-hello.js
+neobasic -r raylib-hello.js
 ```
 
-The `raylib.js` module automatically detects the neobasic runtime via `globalThis.scriptArgs` and uses the native C module (`raylib_native`) instead of the WASM path. The same compiled `.js` file runs in the browser (WASM) or on the desktop (neobasic) without modification.
-
-**Rebuilding the QJS C module** (after changing `raylib_bridge.c`):
+**Rebuilding the native C module** (after changing `raylib_bridge.c`):
 
 ```bash
 python neo_mods/raylib/build/gen_qjs_module.py
-# then re-run the build script
+# then re-run build_qjs.sh / build_qjs.bat
 ```
 
 ## License

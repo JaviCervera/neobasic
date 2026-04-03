@@ -7,7 +7,12 @@
 
 ## Summary
 
-NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to JavaScript. The compiler is written in **idiomatic TypeScript (strict mode)** and distributed as a **CLI tool** (`neobasic -c input.nb`). Output JS runs in Node or a browser.
+NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to JavaScript. The compiler is written in **idiomatic TypeScript (strict mode)** and distributed as a **CLI tool** (`neobasic -c input.nb`). Output JS runs via QuickJS through the `neobasic` binary.
+
+> **Browser/WASM/Node.js runtime support removed.**  
+> The last commit that included the WASM-backed raylib, browser detection in `core.js`, Node.js file I/O paths, and multi-environment support is:  
+> **`96c6ff21be9479772fec1a2d7316b3fb2821876a`**  
+> Check out that commit to restore or inspect the browser/WASM/Node.js functionality.
 
 ## Key Design Decisions
 
@@ -19,8 +24,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Standard library | A bundled `core` module (auto-imported) provides math, string, and file I/O functions |
 | Testing framework | Vitest |
 | Output | Single `.js` file next to the source (or via `-o` flag) |
-| Node.js module mode | Compiled output uses `require` for file I/O; must run in a CJS context (no `"type": "module"` in the nearest `package.json`). The `examples/` directory ships a `{"type":"commonjs"}` package.json for this reason. |
-| Library distribution | Installable directly from GitHub via `npm install github:JaviCervera/neobasic`; `prepare` script builds `dist/` automatically |
+| Runtime target | QuickJS only via the `neobasic` binary; `core.js` uses `globalThis.std` directly (no Node.js or browser paths) |
 | QuickJS support | `npm run bundle:qjs` produces `dist/neobasic.js` — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/`; run as `qjs dist/neobasic.js -c file.nb` |
 
 ## Architecture
@@ -203,7 +207,9 @@ const core = (() => {
 
 ### Phase 9 — Raylib Module
 
-**Goal:** Add a `raylib` module that provides full access to the Raylib game development library via WebAssembly, enabling NeoBasic programs to create graphical applications.
+> **Note:** The WASM/browser path described in sections 9.0–9.4 has been removed. `raylib.js` now exclusively uses the native QJS C module (`raylib_native`). The last commit containing the WASM implementation is `96c6ff21be9479772fec1a2d7316b3fb2821876a`. Sections 9.0–9.4 below are kept as historical documentation.
+
+**Goal:** Add a `raylib` module that provides full access to the Raylib game development library via a native QuickJS C module statically linked into the `neobasic` binary.
 
 #### 9.0 — Design Decisions
 
@@ -440,6 +446,8 @@ CloseWindow()
 - Add the example above to `examples/`
 
 ### Phase 10 — Library API
+
+> **Note:** Node.js library distribution is no longer the primary use case. The GitHub npm install approach still works for using the TypeScript compiler pipeline as a library, but the "Using NeoBasic as a library" README section has been removed since the runtime target is now QuickJS-only.
 
 **Goal:** Allow NeoBasic to be used as a Node.js library without being published to npm, installable directly from GitHub.
 
