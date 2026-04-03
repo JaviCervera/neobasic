@@ -311,6 +311,7 @@ static JSValue {cname}(JSContext *ctx, JSValueConst this_val,
 }}""")
 
 TEXT_HELPERS = """\
+#include <ctype.h>
 static JSValue js_raylib_textSubtext(JSContext *ctx, JSValueConst this_val,
     int argc, JSValueConst *argv)
 {
@@ -384,7 +385,6 @@ static JSValue js_raylib_textFindIndex(JSContext *ctx, JSValueConst this_val,
     if (find) JS_FreeCString(ctx, find);
     return JS_NewInt32(ctx, idx);
 }
-#include <ctype.h>
 """
 
 TEXT_HELPER_ENTRIES = [

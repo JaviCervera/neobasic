@@ -41,7 +41,7 @@ case "$(uname -s)" in
         ;;
     Darwin*)
         PLAT_CFLAGS="-DPLATFORM_DESKTOP -DGRAPHICS_API_OPENGL_33"
-        PLAT_LIBS="-framework OpenGL -framework Cocoa -framework IOKit -framework CoreAudio -framework CoreVideo -lm -lpthread"
+        PLAT_LIBS="-framework OpenGL -framework Cocoa -framework IOKit -framework CoreAudio -framework CoreVideo -framework Foundation -lm -lpthread"
         EXE_EXT=""
         RL_SOURCES="rcore rshapes rtextures rtext rmodels raudio utils rglfw"
         ;;
@@ -65,7 +65,12 @@ echo "[1/5] Compiling Raylib..."
 RL_OBJS=""
 for f in $RL_SOURCES; do
     echo "  $f.c"
-    eval "$GCC $CFLAGS -c $RL_SRC/$f.c -o $BUILD_DIR/$f.o"
+    # rglfw.c on macOS includes Objective-C sources; must be compiled as ObjC
+    EXTRA_FLAGS=""
+    if [ "$f" = "rglfw" ] && [ "$(uname -s)" = "Darwin" ]; then
+        EXTRA_FLAGS="-x objective-c"
+    fi
+    eval "$GCC $CFLAGS $EXTRA_FLAGS -c $RL_SRC/$f.c -o $BUILD_DIR/$f.o"
     RL_OBJS="$RL_OBJS $BUILD_DIR/$f.o"
 done
 
