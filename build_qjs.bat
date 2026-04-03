@@ -2,8 +2,8 @@
 REM ================================================================
 REM  build_qjs.bat  --  Build all QuickJS-related artefacts:
 REM
-REM    dist\neobasic-qjs.js   NeoBasic compiler CLI (runs under qjs)
-REM    dist\nbqjs.exe          Custom QuickJS binary with native Raylib
+REM    dist\neobasic.js       NeoBasic compiler CLI (runs under qjs)
+REM    dist\neobasic.exe      Custom QuickJS binary with native Raylib
 REM
 REM  Prerequisites:
 REM    Node.js + npm   https://nodejs.org/
@@ -30,8 +30,8 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM ── Step 1: build neobasic-qjs.js ────────────────────────────────
-echo === [1/2] Building neobasic-qjs.js ===
+REM ── Step 1: build neobasic.js ────────────────────────────────────
+echo === [1/2] Building neobasic.js ===
 
 cd /d "%SCRIPT_DIR%"
 
@@ -41,20 +41,18 @@ if not exist "node_modules" (
     if %errorlevel% neq 0 ( echo FAILED: npm install & exit /b 1 )
 )
 
-echo --^> Running tsc...
-npm run build
-if %errorlevel% neq 0 ( echo FAILED: tsc & exit /b 1 )
-
+REM Bundle CLI for QuickJS -> dist/neobasic.js
+REM (esbuild transpiles TypeScript directly; no prior tsc needed)
 echo --^> Bundling for QuickJS...
 npm run bundle:qjs
 if %errorlevel% neq 0 ( echo FAILED: bundle:qjs & exit /b 1 )
 
 echo.
-echo     dist\neobasic-qjs.js  OK
+echo     dist\neobasic.js  OK
 
-REM ── Step 2: build nbqjs.exe ──────────────────────────────────────
+REM ── Step 2: build neobasic.exe ───────────────────────────────────
 echo.
-echo === [2/2] Building nbqjs.exe ===
+echo === [2/2] Building neobasic.exe ===
 
 set BUILD_NBQJS=%SCRIPT_DIR%neo_mods\raylib\build\build_nbqjs.bat
 if not exist "%BUILD_NBQJS%" (
@@ -68,7 +66,7 @@ if %errorlevel% neq 0 ( echo FAILED: build_nbqjs.bat & exit /b 1 )
 REM ── Done ─────────────────────────────────────────────────────────
 echo.
 echo === Build complete ===
-echo     dist\neobasic-qjs.js
-echo     dist\nbqjs.exe
+echo     dist\neobasic.js
+echo     dist\neobasic.exe
 
 endlocal

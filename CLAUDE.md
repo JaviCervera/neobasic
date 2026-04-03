@@ -7,7 +7,7 @@
 
 ## Summary
 
-NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to JavaScript. The compiler is written in **idiomatic TypeScript (strict mode)** and distributed as a **CLI tool** (`neobasic compile input.nb`). Output JS runs in Node or a browser.
+NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to JavaScript. The compiler is written in **idiomatic TypeScript (strict mode)** and distributed as a **CLI tool** (`neobasic -c input.nb`). Output JS runs in Node or a browser.
 
 ## Key Design Decisions
 
@@ -21,7 +21,7 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Output | Single `.js` file next to the source (or via `-o` flag) |
 | Node.js module mode | Compiled output uses `require` for file I/O; must run in a CJS context (no `"type": "module"` in the nearest `package.json`). The `examples/` directory ships a `{"type":"commonjs"}` package.json for this reason. |
 | Library distribution | Installable directly from GitHub via `npm install github:JaviCervera/neobasic`; `prepare` script builds `dist/` automatically |
-| QuickJS support | `npm run bundle:qjs` produces `dist/neobasic-qjs.js` — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/`; run as `qjs dist/neobasic-qjs.js compile file.nb` |
+| QuickJS support | `npm run bundle:qjs` produces `dist/neobasic.js` — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/`; run as `qjs dist/neobasic.js -c file.nb` |
 
 ## Architecture
 
@@ -166,7 +166,9 @@ vitest.config.ts
 - Register module symbols into the global symbol table before type checking
 
 ### Phase 6 — CLI
-- `neobasic compile <file.nb> [-o <out.js>]`
+- `neobasic -c <file.nb> [-o <out.js>]` — compile to JavaScript file
+- `neobasic -r <file.nb>` — compile in memory and execute immediately (no .js written)
+- `neobasic -r <file.js>` — run a JavaScript file directly
 - Collect all `Include`-d files, resolve and concatenate their ASTs before type-checking
 - Emit clear error messages with file, line, and column
 
@@ -463,7 +465,7 @@ CloseWindow()
 
 **Goal:** Allow `neobasic` to run under [QuickJS](https://bellard.org/quickjs/) as a self-contained CLI binary.
 
-**Why a separate bundle:** The standard `dist/neobasic.js` is built with `--platform node`, leaving `node:fs`, `node:path`, `node:os`, `node:url` as static ESM imports. QuickJS cannot resolve these. Setting `globalThis` polyfills before the bundle loads does not help — static module imports are resolved before any user code runs. The solution is to replace the Node.js module imports at bundle time using esbuild's `--alias` option.
+**Why a separate bundle:** The standard `dist/compiler.js` (TypeScript library) is built with `--platform node`, leaving `node:fs`, `node:path`, `node:os`, `node:url` as static ESM imports. QuickJS cannot resolve these. Setting `globalThis` polyfills before the bundle loads does not help — static module imports are resolved before any user code runs. The solution is to replace the Node.js module imports at bundle time using esbuild's `--alias` option.
 
 **Changes:**
 
@@ -474,7 +476,7 @@ CloseWindow()
   - `qjs-url.js`: `fileURLToPath` strips `file:///` prefix (handles Windows `file:///C:/...` form)
   - `qjs-process.js`: injected as a global via esbuild `--inject`; provides `process.argv` (from `scriptArgs`, shifted to match Node's `.slice(2)` convention), `process.cwd()`, and `process.exit()`; also polyfills `console.error` / `console.warn` (QuickJS only guarantees `console.log`)
 
-- **`src/modules/module-loader.ts`** — search path for the package's own `neo_mods/` now tries **both** `../neo_mods` and `../../neo_mods` relative to `import.meta.url`. This handles: single-file bundle at `dist/neobasic-qjs.js` (one level up) and the standard multi-file build at `dist/modules/module-loader.js` (two levels up).
+- **`src/modules/module-loader.ts`** — search path for the package's own `neo_mods/` now tries **both** `../neo_mods` and `../../neo_mods` relative to `import.meta.url`. This handles: single-file bundle at `dist/neobasic.js` (one level up) and the standard multi-file build at `dist/modules/module-loader.js` (two levels up).
 
 - **`src/cli.ts`** — changed `→` to `->` in the compilation success message. QuickJS on Windows outputs UTF-8 but the default Windows console interprets it as CP1252, garbling the arrow.
 
@@ -487,23 +489,23 @@ CloseWindow()
     --alias:node:url=./src/shims/qjs-url.js
     --inject:src/shims/qjs-process.js
     --external:std --external:os
-    --outfile=dist/neobasic-qjs.js
+    --outfile=dist/neobasic.js
   ```
   `std` and `os` are kept external so QuickJS resolves them as built-in modules at runtime.
 
 **Usage:**
 ```sh
 npm run bundle:qjs
-qjs dist/neobasic-qjs.js compile myprogram.nb
+qjs dist/neobasic.js -c myprogram.nb
 ```
 
-### Phase 12 — nbqjs: QuickJS with Native Raylib
+### Phase 12 — neobasic: QuickJS with Native Raylib
 
-**Goal:** Provide a custom QuickJS binary (`dist/nbqjs.exe`) with Raylib statically linked as a built-in module, so compiled NeoBasic programs can use Raylib natively on the desktop without WASM or a browser.
+**Goal:** Provide a custom QuickJS binary (`dist/neobasic.exe`) with Raylib statically linked as a built-in module, so compiled NeoBasic programs can use Raylib natively on the desktop without WASM or a browser.
 
 #### Architecture
 
-- **`dist/nbqjs.exe`** — custom QuickJS binary with Raylib statically linked in. Registers `"raylib_native"` as a built-in module before any script runs.
+- **`dist/neobasic.exe`** — custom QuickJS binary with Raylib statically linked in. Registers `"raylib_native"` as a built-in module before any script runs.
 - **`neo_mods/raylib/raylib.js`** — detects QuickJS at runtime via `globalThis.scriptArgs` and branches to use the native C module; falls back to the WASM path for browser/Node.
 - The compiled NeoBasic output is unchanged — the QJS detection lives entirely in `raylib.js`.
 
@@ -511,11 +513,11 @@ qjs dist/neobasic-qjs.js compile myprogram.nb
 
 | File | Purpose |
 |---|---|
-| `neo_mods/raylib/build/nbqjs_main.c` | Custom QuickJS entry point; calls `js_init_module_raylib(ctx, "raylib_native")` in the context constructor |
+| `neo_mods/raylib/build/nbqjs_main.c` | Custom QuickJS entry point; registers `raylib_native`; implements `-c`/`-r`/default CLI modes; `-r .nb` uses `__neobasic_emit` to compile in memory |
 | `neo_mods/raylib/build/gen_qjs_module.py` | Python generator that reads `raylib_bridge.c` and emits `raylib_qjs_module.c` |
 | `neo_mods/raylib/build/raylib_qjs_module.c` | **AUTO-GENERATED** — 276 QJS C wrapper functions for all bridge/color/text-helper functions |
 | `neo_mods/raylib/build/emscripten.h` | Minimal stub so `raylib_bridge.c` compiles without the Emscripten toolchain |
-| `neo_mods/raylib/build/qjsc_stubs.c` | Stub `qjsc_repl[]` and `qjsc_repl_size` so nbqjs links without the full qjsc toolchain |
+| `neo_mods/raylib/build/qjsc_stubs.c` | Stub `qjsc_repl[]` and `qjsc_repl_size` so neobasic links without the full qjsc toolchain |
 | `neo_mods/raylib/build/build_nbqjs.bat` | Windows batch build script (MinGW) |
 | `neo_mods/raylib/build/build_nbqjs.sh` | Linux/macOS/MSYS2 bash build script |
 
@@ -525,7 +527,7 @@ qjs dist/neobasic-qjs.js compile myprogram.nb
 - **QuickJS source** must be present at `lib/quickjs-2025-09-13/`.
 - **Windows:** MinGW-w64 gcc on PATH (or `C:\mingw32\bin\gcc.exe`). No MSVC needed.
 - **Linux/macOS:** System gcc + X11/OpenGL dev packages.
-- No Emscripten required — the WASM build and nbqjs build are independent.
+- No Emscripten required — the WASM build and neobasic build are independent.
 
 #### Build Steps
 
@@ -537,7 +539,7 @@ neo_mods\raylib\build\build_nbqjs.bat
 bash neo_mods/raylib/build/build_nbqjs.sh
 ```
 
-Produces `dist/nbqjs.exe` (Windows) or `dist/nbqjs` (Unix).
+Produces `dist/neobasic.exe` (Windows) or `dist/neobasic` (Unix).
 
 If `raylib_qjs_module.c` is missing, the build scripts regenerate it automatically via `python gen_qjs_module.py`.
 
@@ -560,14 +562,14 @@ if (__RAYLIB_IS_QJS) {
 #### Usage
 
 ```sh
-# 1. Compile your NeoBasic program to JS (using standard neobasic CLI or neobasic-qjs.js)
-node dist/cli.js compile myprogram.nb -o myprogram.js
-# or:
-qjs dist/neobasic-qjs.js compile myprogram.nb
+# Compile and run in one step (no .js file written)
+dist\neobasic.exe -r myprogram.nb    # Windows
+./dist/neobasic -r myprogram.nb      # Linux/macOS
 
-# 2. Run with nbqjs
-dist\nbqjs.exe myprogram.js        # Windows
-./dist/nbqjs myprogram.js           # Linux/macOS
+# Or compile first, then run the .js
+node dist/cli.js -c myprogram.nb -o myprogram.js
+dist\neobasic.exe -r myprogram.js    # Windows
+./dist/neobasic -r myprogram.js      # Linux/macOS
 ```
 
 ## Bundled modules
@@ -663,19 +665,19 @@ See Phase 9 for full implementation details.
 - Watch mode
 
 <!--
-## Design Decisions with Alternative Choices (Phase 12 — nbqjs / Native Raylib)
+## Design Decisions with Alternative Choices (Phase 12 — neobasic / Native Raylib)
 
-The following decisions were made when implementing the nbqjs native Raylib module.
+The following decisions were made when implementing the neobasic native Raylib module.
 Each has a reasonable alternative. Review these if you want to change direction.
 
 ### 1. Static linking vs. DLL / shared library
-**Chosen:** Raylib and the QJS C module are statically linked into `nbqjs.exe`.
+**Chosen:** Raylib and the QJS C module are statically linked into `neobasic.exe`.
 **Alternative:** Compile `raylib_qjs_module.dll` (Windows) / `.so` (Linux) separately.
   Users copy the DLL alongside their compiled `.js` files and call `import('raylib_qjs_module.dll')`.
   This is what the original RAYLIB-QJS-PLAN.md described.
 **Why static was chosen:** No deployment complexity — single executable, no DLL path issues.
-**Downside of static:** nbqjs.exe is ~2.8MB. Users who don't use Raylib still carry the weight.
-  A DLL approach would let `nbqjs` remain small and load Raylib on demand.
+**Downside of static:** neobasic.exe is ~2.8MB. Users who don't use Raylib still carry the weight.
+  A DLL approach would let `neobasic` remain small and load Raylib on demand.
 
 ### 2. 32-bit MinGW (i686) vs. 64-bit MinGW-w64
 **Chosen:** 32-bit MinGW (i686 GCC 8.1.0) because it was the only compiler available on this machine.
@@ -684,7 +686,7 @@ Each has a reasonable alternative. Review these if you want to change direction.
   The build scripts already detect MSYS2 at `C:\msys64\mingw64\bin\gcc.exe`.
 **Why 64-bit is preferred:** Raylib is a game engine; 64-bit gives access to more RAM, better
   performance, and is required by some third-party libraries.
-**Impact:** 32-bit nbqjs.exe is limited to 4GB address space. For typical games this is fine.
+**Impact:** 32-bit neobasic.exe is limited to 4GB address space. For typical games this is fine.
 
 ### 3. Built-in module name: "raylib_native" vs. "raylib"
 **Chosen:** `"raylib_native"` to avoid conflict with the NeoBasic module loader's
@@ -723,7 +725,7 @@ Each has a reasonable alternative. Review these if you want to change direction.
 ### 7. QuickJS detection heuristic
 **Chosen:** `typeof globalThis.scriptArgs !== 'undefined' && typeof globalThis.process === 'undefined' && typeof globalThis.window === 'undefined'`.
 **Alternative:** Use a compile-time flag in the NeoBasic compiler to emit `const __QJS = true;`
-  when targeting nbqjs.
+  when targeting neobasic.
 **Why runtime detection was chosen:** Works without any compiler changes.
   The heuristic is reliable: `scriptArgs` is set by QuickJS's `js_std_add_helpers`,
   `process` is not present in stock QJS, and `window` is not present outside browsers.

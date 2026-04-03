@@ -39,9 +39,12 @@ export function basename(p, ext) {
 export function resolve(...parts) {
   // Like Node's path.resolve: start from cwd, apply each segment in order.
   // `process` is replaced at bundle time by the qjs-process.js inject shim.
+  // NOTE: do NOT call norm() on individual parts — that would strip ".." before
+  // it can be applied against the accumulated base.  Normalise separators only,
+  // then let the final norm() collapse all ".." segments in one pass.
   let resolved = norm(process.cwd());
   for (const p of parts) {
-    const n = norm(p);
+    const n = p.replace(/\\/g, "/");
     if (n.startsWith("/") || /^[a-zA-Z]:/.test(n)) resolved = n;
     else resolved = resolved + "/" + n;
   }

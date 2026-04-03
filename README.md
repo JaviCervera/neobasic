@@ -41,7 +41,7 @@ npm test
 ### Compile a NeoBasic program
 
 ```bash
-node dist/cli.js compile myprogram.nb
+node dist/cli.js -c myprogram.nb
 ```
 
 This produces a single self-contained `myprogram.js` in the same directory — all imported modules are inlined into the output, so you can copy it anywhere and run it without needing any companion files.
@@ -49,7 +49,7 @@ This produces a single self-contained `myprogram.js` in the same directory — a
 You can specify a different output path with `-o`:
 
 ```bash
-node dist/cli.js compile myprogram.nb -o output/myprogram.js
+node dist/cli.js -c myprogram.nb -o output/myprogram.js
 ```
 
 Then run the output with Node:
@@ -63,10 +63,10 @@ node myprogram.js
 ### Run the examples
 
 ```bash
-node dist/cli.js compile examples/hello.nb  && node examples/hello.js
-node dist/cli.js compile examples/math.nb   && node examples/math.js
-node dist/cli.js compile examples/string.nb && node examples/string.js
-node dist/cli.js compile examples/input.nb  && node examples/input.js
+node dist/cli.js -c examples/hello.nb  && node examples/hello.js
+node dist/cli.js -c examples/math.nb   && node examples/math.js
+node dist/cli.js -c examples/string.nb && node examples/string.js
+node dist/cli.js -c examples/input.nb  && node examples/input.js
 ```
 
 The `examples/` directory already contains a `{ "type": "commonjs" }` package.json so file I/O works out of the box.
@@ -77,7 +77,7 @@ After building, you can link the CLI globally:
 
 ```bash
 npm link
-neobasic compile myprogram.nb
+neobasic -c myprogram.nb
 ```
 
 ### Using with QuickJS
@@ -88,10 +88,10 @@ NeoBasic can also be compiled to a self-contained bundle that runs under [QuickJ
 npm run bundle:qjs
 ```
 
-This produces `dist/neobasic-qjs.js` with all Node.js APIs shimmed for QuickJS. Use it as a drop-in CLI replacement:
+This produces `dist/neobasic.js` with all Node.js APIs shimmed for QuickJS. Use it as a drop-in CLI replacement:
 
 ```bash
-qjs dist\neobasic-qjs.js compile examples\hello.nb
+qjs dist\neobasic.js -c examples\hello.nb
 ```
 
 Then run the compiled output. For programs that use `LoadString` or `SaveString`, pass `--std` so QuickJS exposes its built-in `std` module for file I/O:
@@ -101,6 +101,17 @@ qjs --std examples\hello.js
 ```
 
 Without `--std`, file I/O silently no-ops (same behaviour as running in a browser without `localStorage`).
+
+### Using the neobasic binary
+
+When built (see [Raylib section](#running-raylib-programs-with-neobasic-native-desktop-no-browser) for build instructions), the `neobasic` binary provides three modes:
+
+| Command | Behaviour |
+|---|---|
+| `neobasic -c file.nb [-o out.js]` | Compile `.nb` to `.js` |
+| `neobasic -r file.nb` | Compile in memory and run immediately — **no `.js` file is written** |
+| `neobasic -r file.js` | Run a JavaScript file directly |
+| `neobasic [args...]` | Run `program.js` in the current directory, forwarding all args |
 
 ## Using NeoBasic as a library
 
@@ -164,7 +175,7 @@ Produces `dist/neobasic.js` (library API: exports `compileSource` and `compile`)
 npm run bundle:qjs
 ```
 
-Produces `dist/neobasic-qjs.js`. No prior `npm run build` step is needed for either bundle; the bundler handles TypeScript transpilation itself.
+Produces `dist/neobasic.js`. No prior `npm run build` step is needed for either bundle; the bundler handles TypeScript transpilation itself.
 
 ### Running each compiler phase individually
 
@@ -752,11 +763,11 @@ CloseWindow()
 >
 > This downloads raylib 5.0 source, compiles it to WebAssembly, and assembles the final `raylib.js`.
 
-### Running Raylib programs with nbqjs (native desktop, no browser)
+### Running Raylib programs with neobasic (native desktop, no browser)
 
-`dist/nbqjs.exe` is a custom QuickJS binary with Raylib statically linked. It lets you run compiled NeoBasic Raylib programs directly on the desktop without a browser or WASM loader.
+`dist/neobasic.exe` is a custom QuickJS binary with Raylib statically linked. It lets you run compiled NeoBasic Raylib programs directly on the desktop without a browser or WASM loader.
 
-**Build nbqjs** (requires MinGW-w64 on Windows, or GCC on Linux/macOS):
+**Build neobasic** (requires MinGW-w64 on Windows, or GCC on Linux/macOS):
 
 ```bat
 # Windows
@@ -768,7 +779,7 @@ neo_mods\raylib\build\build_nbqjs.bat
 bash neo_mods/raylib/build/build_nbqjs.sh
 ```
 
-Produces `dist/nbqjs.exe` (Windows) or `dist/nbqjs` (Unix).
+Produces `dist/neobasic.exe` (Windows) or `dist/neobasic` (Unix).
 
 **Requirements:**
 - Raylib 5.0 source at `lib/raylib-5.0/`
@@ -778,17 +789,17 @@ Produces `dist/nbqjs.exe` (Windows) or `dist/nbqjs` (Unix).
 **Compile and run a Raylib program:**
 
 ```bash
-# 1. Compile .nb to .js using the NeoBasic compiler
-node dist/cli.js compile examples/raylib-hello.nb -o raylib-hello.js
-# or with the QJS bundle:
-qjs dist/neobasic-qjs.js compile examples/raylib-hello.nb
+# Compile and run in one step (no .js file written)
+dist\neobasic.exe -r examples/raylib-hello.nb    # Windows
+./dist/neobasic -r examples/raylib-hello.nb       # Linux / macOS
 
-# 2. Run with nbqjs
-dist\nbqjs.exe raylib-hello.js          # Windows
-./dist/nbqjs raylib-hello.js             # Linux / macOS
+# Or compile first, then run the .js
+node dist/cli.js -c examples/raylib-hello.nb -o raylib-hello.js
+dist\neobasic.exe -r raylib-hello.js              # Windows
+./dist/neobasic -r raylib-hello.js                # Linux / macOS
 ```
 
-The `raylib.js` module automatically detects nbqjs at runtime and uses the native C module (`raylib_native`) instead of the WASM path. The same compiled `.js` file runs in the browser (WASM) or on the desktop (nbqjs) without modification.
+The `raylib.js` module automatically detects the neobasic runtime via `globalThis.scriptArgs` and uses the native C module (`raylib_native`) instead of the WASM path. The same compiled `.js` file runs in the browser (WASM) or on the desktop (neobasic) without modification.
 
 **Rebuilding the QJS C module** (after changing `raylib_bridge.c`):
 

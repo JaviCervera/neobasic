@@ -18,7 +18,7 @@ function main(): void {
     process.exit(0);
   }
 
-  if (args[0] !== "compile") {
+  if (args[0] !== "-c") {
     console.error(`Unknown command: ${args[0]}`);
     printUsage();
     process.exit(1);
@@ -27,6 +27,7 @@ function main(): void {
   // Parse compile command options
   let inputFile: string | null = null;
   let outputFile: string | null = null;
+  let emitToGlobal = false; // --emit: pass compiled JS to globalThis.__neobasic_emit instead of writing to disk
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "-o" || args[i] === "--output") {
@@ -36,6 +37,8 @@ function main(): void {
         process.exit(1);
       }
       outputFile = args[i];
+    } else if (args[i] === "--emit") {
+      emitToGlobal = true;
     } else if (args[i].startsWith("-")) {
       console.error(`Unknown option: ${args[i]}`);
       process.exit(1);
@@ -63,8 +66,14 @@ function main(): void {
 
   try {
     const result = compile(inputFile!);
-    fs.writeFileSync(outputFile!, result.js, "utf-8");
-    console.log(`Compiled ${inputFile} -> ${outputFile}`);
+    // --emit: hand code back to the C host via a registered global function
+    // (used by `neobasic -r file.nb` to compile in memory without writing a file)
+    if (emitToGlobal && typeof (globalThis as any).__neobasic_emit === "function") {
+      (globalThis as any).__neobasic_emit(result.js);
+    } else {
+      fs.writeFileSync(outputFile!, result.js, "utf-8");
+      console.log(`Compiled ${inputFile} -> ${outputFile}`);
+    }
   } catch (e) {
     if (e instanceof NeoBasicError) {
       console.error(`Error: ${e.message}`);
@@ -75,13 +84,12 @@ function main(): void {
 }
 
 function printUsage(): void {
-  console.log(`Usage: neobasic compile <file.nb> [-o <output.js>]
-
-Commands:
-  compile    Compile a NeoBasic source file to JavaScript
+  console.log(`Usage: neobasic -c <file.nb> [-o <output.js>]
 
 Options:
+  -c <file.nb>          Compile a NeoBasic source file to JavaScript
   -o, --output <file>   Output file path (default: <input>.js)
+  --emit                Pass compiled JS to globalThis.__neobasic_emit (internal)
   -h, --help            Show this help message
   -v, --version         Show version`);
 }

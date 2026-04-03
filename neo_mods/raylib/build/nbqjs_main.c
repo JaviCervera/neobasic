@@ -1,29 +1,43 @@
 /*
- * nbqjs — NeoBasic QuickJS interpreter
+ * neobasic — NeoBasic QuickJS interpreter
  *
  * Custom QuickJS entry point that additionally registers the
  * "raylib_native" built-in C module so compiled NeoBasic programs
  * that import raylib can call Raylib directly without any DLL.
+ *
+ * CLI behaviour:
+ *   neobasic -c <file.nb> [-o <out.js>]
+ *       Runs neobasic.js (located next to this binary) with the given
+ *       arguments forwarded, compiling the NeoBasic source to JavaScript.
+ *
+ *   neobasic -r <file.nb>
+ *       Compiles <file.nb> in memory (no .js file is written) using
+ *       neobasic.js, then executes the resulting JavaScript immediately.
+ *
+ *   neobasic -r <file.js>
+ *       Runs <file.js> directly.
+ *
+ *   neobasic [args...]
+ *       Runs program.js in the current working directory, forwarding
+ *       all arguments to the script via process.argv.slice(2).
  *
  * Based on QuickJS qjs.c (Copyright Fabrice Bellard / Charlie Gordon).
  * QuickJS is MIT-licensed; see lib/quickjs-2025-09-13/LICENSE.
  */
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdarg.h>
-#include <inttypes.h>
 #include <string.h>
-#include <assert.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <time.h>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
+/* Forward-declare _NSGetExecutablePath to avoid including <mach-o/dyld.h>,
+ * which defines FALSE/TRUE in an enum that conflicts with QuickJS cutils.h. */
 #if defined(__APPLE__)
-#include <malloc/malloc.h>
-#elif defined(__linux__) || defined(__GLIBC__)
-#include <malloc.h>
-#elif defined(__FreeBSD__)
-#include <malloc_np.h>
+#include <stdint.h>
+extern int _NSGetExecutablePath(char *buf, uint32_t *bufsize);
 #endif
 
 #include "cutils.h"
@@ -34,6 +48,25 @@ JSModuleDef *js_init_module_raylib(JSContext *ctx, const char *module_name);
 
 extern const uint8_t qjsc_repl[];
 extern const uint32_t qjsc_repl_size;
+
+/* ── In-memory compilation support ─────────────────────────────────────────
+ * When neobasic -r file.nb is used, the C host registers __neobasic_emit as
+ * a global function.  The compiler (neobasic.js --emit) calls it with the
+ * compiled JavaScript string instead of writing a file to disk.
+ * g_emitted_code holds the JSValue until the host consumes it.
+ */
+static JSValue g_emitted_code;
+
+static JSValue js_neobasic_emit(JSContext *ctx, JSValueConst this_val,
+                                int argc, JSValueConst *argv)
+{
+    (void)this_val;
+    if (argc > 0 && JS_IsString(argv[0])) {
+        JS_FreeValue(ctx, g_emitted_code);
+        g_emitted_code = JS_DupValue(ctx, argv[0]);
+    }
+    return JS_UNDEFINED;
+}
 
 static int eval_buf(JSContext *ctx, const void *buf, int buf_len,
                     const char *filename, int eval_flags)
@@ -101,266 +134,225 @@ static JSContext *JS_NewCustomContext(JSRuntime *rt)
     return ctx;
 }
 
-#if defined(__APPLE__)
-#define MALLOC_OVERHEAD  0
-#else
-#define MALLOC_OVERHEAD  8
-#endif
+#define PROG_NAME "neobasic"
 
-struct trace_malloc_data { uint8_t *base; };
-
-static inline unsigned long long js_trace_malloc_ptr_offset(uint8_t *ptr,
-                                             struct trace_malloc_data *dp)
-{ return ptr - dp->base; }
-
-static size_t js_trace_malloc_usable_size(const void *ptr)
+/* Return the directory containing this executable (no trailing slash).
+ * Falls back to argv0's dirname when the OS path cannot be determined. */
+static void get_exe_dir(const char *argv0, char *buf, size_t buf_size)
 {
+    buf[0] = '\0';
 #if defined(__APPLE__)
-    return malloc_size(ptr);
-#elif defined(_WIN32)
-    return _msize((void *)ptr);
-#elif defined(EMSCRIPTEN)
-    return 0;
-#elif defined(__linux__) || defined(__GLIBC__)
-    return malloc_usable_size((void *)ptr);
-#else
-    return malloc_usable_size((void *)ptr);
-#endif
-}
-
-static void
-#ifdef _WIN32
-__attribute__((format(gnu_printf, 2, 3)))
-#else
-__attribute__((format(printf, 2, 3)))
-#endif
-    js_trace_malloc_printf(JSMallocState *s, const char *fmt, ...)
-{
-    va_list ap; int c;
-    va_start(ap, fmt);
-    while ((c = *fmt++) != '\0') {
-        if (c == '%') {
-            if (*fmt == 'p') {
-                uint8_t *ptr = va_arg(ap, void *);
-                if (!ptr) printf("NULL");
-                else printf("H%+06lld.%zd",
-                       js_trace_malloc_ptr_offset(ptr, s->opaque),
-                       js_trace_malloc_usable_size(ptr));
-                fmt++; continue;
-            }
-            if (fmt[0] == 'z' && fmt[1] == 'd') {
-                printf("%zd", va_arg(ap, size_t)); fmt += 2; continue;
-            }
+    {
+        uint32_t size = (uint32_t)buf_size;
+        char tmp[4096];
+        if (_NSGetExecutablePath(tmp, &size) == 0) {
+            char *slash = strrchr(tmp, '/');
+            if (slash) { size_t n = slash - tmp; if (n < buf_size) { memcpy(buf, tmp, n); buf[n] = '\0'; return; } }
         }
-        putc(c, stdout);
     }
-    va_end(ap);
+#elif defined(__linux__) || defined(__GLIBC__)
+    {
+        char tmp[4096];
+        ssize_t len = readlink("/proc/self/exe", tmp, sizeof(tmp) - 1);
+        if (len > 0) {
+            tmp[len] = '\0';
+            char *slash = strrchr(tmp, '/');
+            if (slash) { size_t n = slash - tmp; if (n < buf_size) { memcpy(buf, tmp, n); buf[n] = '\0'; return; } }
+        }
+    }
+#elif defined(_WIN32)
+    {
+        char tmp[4096];
+        DWORD len = GetModuleFileNameA(NULL, tmp, (DWORD)sizeof(tmp));
+        if (len > 0) {
+            char *slash = strrchr(tmp, '\\');
+            if (slash) { size_t n = slash - tmp; if (n < buf_size) { memcpy(buf, tmp, n); buf[n] = '\0'; return; } }
+        }
+    }
+#endif
+    /* Fallback: derive from argv0 */
+    {
+        const char *slash = strrchr(argv0, '/');
+#if defined(_WIN32)
+        const char *bslash = strrchr(argv0, '\\');
+        if (bslash && (!slash || bslash > slash)) slash = bslash;
+#endif
+        if (slash) {
+            size_t n = slash - argv0;
+            if (n < buf_size) { memcpy(buf, argv0, n); buf[n] = '\0'; }
+        } else {
+            /* argv0 has no directory component — binary was found via PATH */
+            buf[0] = '.'; buf[1] = '\0';
+        }
+    }
 }
 
-static void js_trace_malloc_init(struct trace_malloc_data *s) { free(s->base = malloc(8)); }
+static void help(void) {
+    printf("NeoBasic " CONFIG_VERSION "\n"
+           "usage: " PROG_NAME " -c <file.nb> [-o <output.js>]\n"
+           "       " PROG_NAME " -r <file.nb|file.js>\n"
+           "       " PROG_NAME " [args...]\n"
+           "\n"
+           "  -c <file.nb>          Compile a NeoBasic source file to JavaScript\n"
+           "                        (writes <file>.js next to the source)\n"
+           "  -o <output.js>        Output path for -c (default: <input>.js)\n"
+           "  -r <file.nb>          Compile and run a NeoBasic file in one step\n"
+           "                        (no .js file is written to disk)\n"
+           "  -r <file.js>          Run a JavaScript file directly\n"
+           "  -h, --help            Show this help message\n"
+           "  -v, --version         Show version\n"
+           "\n"
+           "  When called without -c or -r, runs program.js in the current\n"
+           "  directory and forwards all arguments to it.\n");
+    exit(0);
+}
 
-static void *js_trace_malloc(JSMallocState *s, size_t size)
+/* Returns 1 if the path ends with the given suffix (case-sensitive). */
+static int path_has_suffix(const char *path, const char *suffix)
 {
-    void *ptr;
-    assert(size != 0);
-    if (unlikely(s->malloc_size + size > s->malloc_limit)) return NULL;
-    ptr = malloc(size);
-    js_trace_malloc_printf(s, "A %zd -> %p\n", size, ptr);
-    if (ptr) { s->malloc_count++; s->malloc_size += js_trace_malloc_usable_size(ptr) + MALLOC_OVERHEAD; }
-    return ptr;
-}
-static void js_trace_free(JSMallocState *s, void *ptr) {
-    if (!ptr) return;
-    js_trace_malloc_printf(s, "F %p\n", ptr);
-    s->malloc_count--; s->malloc_size -= js_trace_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
-    free(ptr);
-}
-static void *js_trace_realloc(JSMallocState *s, void *ptr, size_t size) {
-    size_t old_size;
-    if (!ptr) { if (size == 0) return NULL; return js_trace_malloc(s, size); }
-    old_size = js_trace_malloc_usable_size(ptr);
-    if (size == 0) {
-        js_trace_malloc_printf(s, "R %zd %p\n", size, ptr);
-        s->malloc_count--; s->malloc_size -= old_size + MALLOC_OVERHEAD;
-        free(ptr); return NULL;
-    }
-    if (s->malloc_size + size - old_size > s->malloc_limit) return NULL;
-    js_trace_malloc_printf(s, "R %zd %p", size, ptr);
-    ptr = realloc(ptr, size);
-    js_trace_malloc_printf(s, " -> %p\n", ptr);
-    if (ptr) s->malloc_size += js_trace_malloc_usable_size(ptr) - old_size;
-    return ptr;
-}
-static const JSMallocFunctions trace_mf = {
-    js_trace_malloc, js_trace_free, js_trace_realloc, js_trace_malloc_usable_size,
-};
-
-static size_t get_suffixed_size(const char *str) {
-    char *p; size_t v;
-    v = (size_t)strtod(str, &p);
-    switch (*p) {
-    case 'G': v <<= 30; break; case 'M': v <<= 20; break;
-    case 'k': case 'K': v <<= 10; break;
-    default:
-        if (*p != '\0') { fprintf(stderr, "nbqjs: invalid suffix: %s\n", p); exit(1); }
-    }
-    return v;
-}
-
-#define PROG_NAME "nbqjs"
-
-void help(void) {
-    printf("NeoBasic QuickJS " CONFIG_VERSION "\n"
-           "usage: " PROG_NAME " [options] [file [args]]\n"
-           "-h  --help         list options\n"
-           "-e  --eval EXPR    evaluate EXPR\n"
-           "-i  --interactive  go to interactive mode\n"
-           "-m  --module       load as ES6 module (default=autodetect)\n"
-           "    --script       load as ES6 script (default=autodetect)\n"
-           "-I  --include file include an additional file\n"
-           "    --std          make 'std' and 'os' available to the loaded script\n"
-           "-T  --trace        trace memory allocation\n"
-           "-d  --dump         dump the memory usage stats\n"
-           "    --memory-limit n  limit the memory usage to 'n' bytes\n"
-           "    --stack-size n    limit the stack size to 'n' bytes\n"
-           "    --no-unhandled-rejection  ignore unhandled promise rejections\n"
-           "-q  --quit         just instantiate the interpreter and quit\n");
-    exit(1);
+    size_t plen = strlen(path);
+    size_t slen = strlen(suffix);
+    return plen >= slen && strcmp(path + plen - slen, suffix) == 0;
 }
 
 int main(int argc, char **argv)
 {
-    JSRuntime *rt;
-    JSContext *ctx;
-    struct trace_malloc_data trace_data = { NULL };
-    int optind;
-    char *expr = NULL;
-    int interactive = 0;
-    int dump_memory = 0;
-    int trace_memory = 0;
-    int empty_run = 0;
-    int module = -1;
-    int load_std = 0;
-    int dump_unhandled_promise_rejection = 1;
-    size_t memory_limit = 0;
-    char *include_list[32];
-    int i, include_count = 0;
-    int strip_flags = 0;
-    size_t stack_size = 0;
+    int is_compile = (argc >= 2 && strcmp(argv[1], "-c") == 0);
+    int is_run     = (argc >= 2 && strcmp(argv[1], "-r") == 0);
+    int is_help    = (argc >= 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0));
+    int is_version = (argc >= 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0));
 
-    optind = 1;
-    while (optind < argc && *argv[optind] == '-') {
-        char *arg = argv[optind] + 1;
-        const char *longopt = "";
-        if (!*arg) break;
-        optind++;
-        if (*arg == '-') {
-            longopt = arg + 1; arg += strlen(arg);
-            if (!*longopt) break;
-        }
-        for (; *arg || *longopt; longopt = "") {
-            char opt = *arg;
-            if (opt) arg++;
-            if (opt == 'h' || opt == '?' || !strcmp(longopt, "help")) { help(); continue; }
-            if (opt == 'e' || !strcmp(longopt, "eval")) {
-                if (*arg) { expr = arg; break; }
-                if (optind < argc) { expr = argv[optind++]; break; }
-                fprintf(stderr, "nbqjs: missing expression for -e\n"); exit(2);
-            }
-            if (opt == 'I' || !strcmp(longopt, "include")) {
-                if (optind >= argc) { fprintf(stderr, "expecting filename"); exit(1); }
-                if (include_count >= countof(include_list)) { fprintf(stderr, "too many included files"); exit(1); }
-                include_list[include_count++] = argv[optind++]; continue;
-            }
-            if (opt == 'i' || !strcmp(longopt, "interactive")) { interactive++; continue; }
-            if (opt == 'm' || !strcmp(longopt, "module")) { module = 1; continue; }
-            if (!strcmp(longopt, "script")) { module = 0; continue; }
-            if (opt == 'd' || !strcmp(longopt, "dump")) { dump_memory++; continue; }
-            if (opt == 'T' || !strcmp(longopt, "trace")) { trace_memory++; continue; }
-            if (!strcmp(longopt, "std")) { load_std = 1; continue; }
-            if (!strcmp(longopt, "no-unhandled-rejection")) { dump_unhandled_promise_rejection = 0; continue; }
-            if (opt == 'q' || !strcmp(longopt, "quit")) { empty_run++; continue; }
-            if (!strcmp(longopt, "memory-limit")) {
-                if (optind >= argc) { fprintf(stderr, "expecting memory limit"); exit(1); }
-                memory_limit = get_suffixed_size(argv[optind++]); continue;
-            }
-            if (!strcmp(longopt, "stack-size")) {
-                if (optind >= argc) { fprintf(stderr, "expecting stack size"); exit(1); }
-                stack_size = get_suffixed_size(argv[optind++]); continue;
-            }
-            if (opt == 's') { strip_flags = JS_STRIP_DEBUG; continue; }
-            if (!strcmp(longopt, "strip-source")) { strip_flags = JS_STRIP_SOURCE; continue; }
-            if (opt) fprintf(stderr, "nbqjs: unknown option '-%c'\n", opt);
-            else fprintf(stderr, "nbqjs: unknown option '--%s'\n", longopt);
-            help();
-        }
+    if (is_help)    { help(); return 0; }
+    if (is_version) { printf("neobasic " CONFIG_VERSION "\n"); return 0; }
+
+    if (is_run && argc < 3) {
+        fprintf(stderr, PROG_NAME ": -r requires a filename\n");
+        return 1;
     }
 
-    if (trace_memory) {
-        js_trace_malloc_init(&trace_data);
-        rt = JS_NewRuntime2(&trace_mf, &trace_data);
+    /* Locate neobasic.js (the bundled compiler) next to this binary */
+    char exe_dir[4096];
+    get_exe_dir(argv[0], exe_dir, sizeof(exe_dir));
+    char neobasic_js[4096];
+    snprintf(neobasic_js, sizeof(neobasic_js), "%s/neobasic.js", exe_dir);
+
+    /* Determine the script to run and the argv array QuickJS will see.
+     *
+     * js_std_add_helpers(ctx, helper_argc, helper_argv) sets scriptArgs so that
+     * process.argv.slice(2) == helper_argv[1..].  We build helper_argv so that
+     * the script and any user-visible args map correctly.
+     */
+    char script_path[4096];
+    int run_mode_nb = 0; /* -r .nb: compile in memory then exec */
+
+    int helper_argc;
+    char **helper_argv;
+
+    if (is_compile) {
+        /* -c mode: forward all original args to the compiler */
+        snprintf(script_path, sizeof(script_path), "%s", neobasic_js);
+        helper_argc = argc;
+        helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
+        if (!helper_argv) goto oom;
+        helper_argv[0] = script_path;
+        for (int i = 1; i < argc; i++) helper_argv[i] = argv[i];
+
+    } else if (is_run) {
+        const char *run_file = argv[2];
+
+        if (path_has_suffix(run_file, ".nb")) {
+            /* Compile in memory, then execute */
+            run_mode_nb = 1;
+            snprintf(script_path, sizeof(script_path), "%s", neobasic_js);
+            /* Compiler args: neobasic.js -c <file.nb> --emit */
+            helper_argc = 4;
+            helper_argv = (char **)malloc(4 * sizeof(char *));
+            if (!helper_argv) goto oom;
+            helper_argv[0] = script_path;
+            helper_argv[1] = "-c";
+            helper_argv[2] = (char *)run_file;
+            helper_argv[3] = "--emit";
+
+        } else {
+            /* .js (or other extension): run directly */
+            snprintf(script_path, sizeof(script_path), "%s", run_file);
+            /* Forward argv[3..] as user args */
+            helper_argc = argc - 2;
+            helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
+            if (!helper_argv) goto oom;
+            helper_argv[0] = script_path;
+            for (int i = 1; i < helper_argc; i++) helper_argv[i] = argv[i + 2];
+        }
+
     } else {
-        rt = JS_NewRuntime();
+        /* Default: run program.js in cwd, forward all original args */
+        snprintf(script_path, sizeof(script_path), "program.js");
+        helper_argc = argc;
+        helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
+        if (!helper_argv) goto oom;
+        helper_argv[0] = script_path;
+        for (int i = 1; i < argc; i++) helper_argv[i] = argv[i];
     }
-    if (!rt) { fprintf(stderr, "nbqjs: cannot allocate JS runtime\n"); exit(2); }
-    if (memory_limit != 0) JS_SetMemoryLimit(rt, memory_limit);
-    if (stack_size != 0) JS_SetMaxStackSize(rt, stack_size);
-    JS_SetStripInfo(rt, strip_flags);
+
+    /* ── QuickJS runtime / context setup ─────────────────────────────── */
+    JSRuntime *rt = JS_NewRuntime();
+    if (!rt) { fprintf(stderr, PROG_NAME ": cannot allocate JS runtime\n"); free(helper_argv); return 2; }
     js_std_set_worker_new_context_func(JS_NewCustomContext);
     js_std_init_handlers(rt);
-    ctx = JS_NewCustomContext(rt);
-    if (!ctx) { fprintf(stderr, "nbqjs: cannot allocate JS context\n"); exit(2); }
+    JSContext *ctx = JS_NewCustomContext(rt);
+    if (!ctx) { fprintf(stderr, PROG_NAME ": cannot allocate JS context\n"); JS_FreeRuntime(rt); free(helper_argv); return 2; }
 
     JS_SetModuleLoaderFunc2(rt, NULL, js_module_loader, js_module_check_attributes, NULL);
+    JS_SetHostPromiseRejectionTracker(rt, js_std_promise_rejection_tracker, NULL);
 
-    if (dump_unhandled_promise_rejection)
-        JS_SetHostPromiseRejectionTracker(rt, js_std_promise_rejection_tracker, NULL);
+    /* For -r .nb: register __neobasic_emit so the compiler can hand back the
+     * compiled JS string without writing any file to disk. */
+    g_emitted_code = JS_UNDEFINED;
+    if (run_mode_nb) {
+        JSValue global = JS_GetGlobalObject(ctx);
+        JSValue emit_fn = JS_NewCFunction(ctx, js_neobasic_emit, "__neobasic_emit", 1);
+        JS_SetPropertyStr(ctx, global, "__neobasic_emit", emit_fn);
+        JS_FreeValue(ctx, global);
+    }
 
-    if (!empty_run) {
-        js_std_add_helpers(ctx, argc - optind, argv + optind);
+    js_std_add_helpers(ctx, helper_argc, helper_argv);
+    free(helper_argv);
 
-        if (load_std) {
-            const char *str = "import * as std from 'std';\n"
-                "import * as os from 'os';\n"
-                "globalThis.std = std;\n"
-                "globalThis.os = os;\n";
-            eval_buf(ctx, str, strlen(str), "<input>", JS_EVAL_TYPE_MODULE);
-        }
+    /* ── Phase 1: run script_path (compiler or user program) ─────────── */
+    int ret = eval_file(ctx, script_path, -1);
+    if (ret == 0) js_std_loop(ctx);
 
-        for (i = 0; i < include_count; i++) {
-            if (eval_file(ctx, include_list[i], module))
-                goto fail;
-        }
-
-        if (expr) {
-            if (eval_buf(ctx, expr, strlen(expr), "<cmdline>", 0))
-                goto fail;
-        } else if (optind >= argc) {
-            interactive = 1;
+    /* ── Phase 2 (only for -r .nb): execute the emitted code ─────────── */
+    if (ret == 0 && run_mode_nb) {
+        if (JS_IsUndefined(g_emitted_code)) {
+            fprintf(stderr, PROG_NAME ": -r: compiler produced no output for '%s'\n", argv[2]);
+            ret = 1;
         } else {
-            const char *filename = argv[optind];
-            if (eval_file(ctx, filename, module))
-                goto fail;
+            size_t code_len;
+            const char *code_str = JS_ToCStringLen(ctx, &code_len, g_emitted_code);
+            if (!code_str) {
+                ret = 1;
+            } else {
+                /* Compiled NeoBasic output is always a plain script (IIFEs),
+                 * never an ES module, so use GLOBAL eval. */
+                int eval_flags = JS_DetectModule(code_str, code_len)
+                    ? JS_EVAL_TYPE_MODULE : JS_EVAL_TYPE_GLOBAL;
+                ret = eval_buf(ctx, code_str, (int)code_len, argv[2], eval_flags);
+                JS_FreeCString(ctx, code_str);
+                if (ret == 0) js_std_loop(ctx);
+            }
+            JS_FreeValue(ctx, g_emitted_code);
+            g_emitted_code = JS_UNDEFINED;
         }
-        if (interactive) {
-            JS_SetHostPromiseRejectionTracker(rt, NULL, NULL);
-            js_std_eval_binary(ctx, qjsc_repl, qjsc_repl_size, 0);
-        }
-        js_std_loop(ctx);
     }
 
-    if (dump_memory) {
-        JSMemoryUsage stats;
-        JS_ComputeMemoryUsage(rt, &stats);
-        JS_DumpMemoryUsage(stdout, &stats, rt);
-    }
     js_std_free_handlers(rt);
     JS_FreeContext(ctx);
     JS_FreeRuntime(rt);
-    return 0;
- fail:
-    js_std_free_handlers(rt);
-    JS_FreeContext(ctx);
-    JS_FreeRuntime(rt);
-    return 1;
+    return (ret != 0) ? 1 : 0;
+
+oom:
+    fprintf(stderr, PROG_NAME ": out of memory\n");
+    return 2;
 }
+

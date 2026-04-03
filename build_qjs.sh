@@ -2,15 +2,15 @@
 # =================================================================
 # build_qjs.sh  --  Build all QuickJS-related artefacts:
 #
-#   dist/neobasic-qjs.js   NeoBasic compiler CLI (runs under qjs)
-#   dist/nbqjs[.exe]       Custom QuickJS binary with native Raylib
+#   dist/neobasic.js       NeoBasic compiler CLI (runs under qjs)
+#   dist/neobasic[.exe]    Custom QuickJS binary with native Raylib
 #
 # Prerequisites (both targets):
-#   Node.js + npm          (for neobasic-qjs.js)
+#   Node.js + npm          (for neobasic.js)
 #   Python 3               (for gen_qjs_module.py)
-#   gcc                    (for nbqjs)
+#   gcc                    (for neobasic)
 #
-# Additional prerequisites for nbqjs:
+# Additional prerequisites for neobasic:
 #   Linux  : libX11-dev, libXrandr-dev, libXinerama-dev,
 #             libXcursor-dev, libXi-dev, libGL-dev (or mesa-dev)
 #   macOS  : Xcode command-line tools
@@ -28,8 +28,8 @@ need() {
     command -v "$1" >/dev/null 2>&1 || { echo "ERROR: '$1' not found. $2"; exit 1; }
 }
 
-# ── Step 1: build neobasic-qjs.js ────────────────────────────────
-echo "=== [1/2] Building neobasic-qjs.js ==="
+# ── Step 1: build neobasic.js ────────────────────────────────────
+echo "=== [1/2] Building neobasic.js ==="
 need node  "Install Node.js (https://nodejs.org/)"
 need npm   "Install Node.js (https://nodejs.org/)"
 need npx   "Install Node.js (https://nodejs.org/)"
@@ -42,20 +42,17 @@ if [ ! -d "$SCRIPT_DIR/node_modules" ]; then
     npm install
 fi
 
-# Compile TypeScript → dist/
-echo "--> Running tsc..."
-npm run build
-
-# Bundle for QuickJS → dist/neobasic-qjs.js
+# Bundle CLI for QuickJS -> dist/neobasic.js
+# (esbuild transpiles TypeScript directly; no prior tsc needed)
 echo "--> Bundling for QuickJS..."
 npm run bundle:qjs
 
 echo ""
-echo "    dist/neobasic-qjs.js  OK"
+echo "    dist/neobasic.js  OK"
 
-# ── Step 2: build nbqjs ──────────────────────────────────────────
+# ── Step 2: build neobasic ───────────────────────────────────────
 echo ""
-echo "=== [2/2] Building nbqjs ==="
+echo "=== [2/2] Building neobasic ==="
 need gcc     "Install gcc (Linux: build-essential; macOS: xcode-select --install)"
 need python3 "Install Python 3 (https://python.org/)"
 
@@ -73,5 +70,5 @@ case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE_EXT=".exe" ;; esac
 
 echo ""
 echo "=== Build complete ==="
-echo "    dist/neobasic-qjs.js"
-echo "    dist/nbqjs$EXE_EXT"
+echo "    dist/neobasic.js"
+echo "    dist/neobasic$EXE_EXT"

@@ -81,8 +81,8 @@ echo [4b] Compiling qjsc_stubs.c...
 if %errorlevel% neq 0 exit /b 1
 
 REM ── Step 4: link ────────────────────────────────────────────────
-echo [5/5] Linking nbqjs.exe...
-"%GCC%" -o "%DIST%\nbqjs.exe" ^
+echo [5/5] Linking neobasic.exe...
+"%GCC%" -o "%DIST%\neobasic.exe" ^
     "%BUILD_DIR%\nbqjs_main.o" ^
     "%BUILD_DIR%\raylib_qjs_module.o" ^
     "%BUILD_DIR%\quickjs.o" "%BUILD_DIR%\dtoa.o" ^
@@ -97,5 +97,5 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo === nbqjs.exe built successfully: %DIST%\nbqjs.exe ===
+echo === neobasic.exe built successfully: %DIST%\neobasic.exe ===
 endlocal

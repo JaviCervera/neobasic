@@ -92,8 +92,8 @@ echo "[4b] Compiling qjsc_stubs.c..."
 eval "$GCC $CFLAGS -c $SCRIPT_DIR/qjsc_stubs.c -o $BUILD_DIR/qjsc_stubs.o"
 
 # ── Step 4: link ─────────────────────────────────────────────────
-echo "[5/5] Linking nbqjs$EXE_EXT..."
-eval "$GCC -o $DIST/nbqjs$EXE_EXT \
+echo "[5/5] Linking neobasic$EXE_EXT..."
+eval "$GCC -o $DIST/neobasic$EXE_EXT \
     $BUILD_DIR/nbqjs_main.o \
     $BUILD_DIR/raylib_qjs_module.o \
     $BUILD_DIR/quickjs.o $BUILD_DIR/dtoa.o \
@@ -104,4 +104,4 @@ eval "$GCC -o $DIST/nbqjs$EXE_EXT \
     $PLAT_LIBS"
 
 echo ""
-echo "=== nbqjs$EXE_EXT built: $DIST/nbqjs$EXE_EXT ==="
+echo "=== neobasic$EXE_EXT built: $DIST/neobasic$EXE_EXT ==="
