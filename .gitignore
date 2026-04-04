@@ -139,6 +139,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Compiled NeoBasic examples
+examples/*.html
 examples/*.js
 examples/*.qjs
 
