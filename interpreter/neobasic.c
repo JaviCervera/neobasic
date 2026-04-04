@@ -304,7 +304,8 @@ static char *base64_encode(const uint8_t *data, size_t len)
 static int write_browser_bundle(const char *js_bundle_path,
                                 const uint8_t *bc, size_t bc_len,
                                 const char *js_code,
-                                const char *exe_dir)
+                                const char *exe_dir,
+                                const char *src_file)
 {
     /* Locate the browser base runtime */
     char base_path[4096];
@@ -319,14 +320,13 @@ static int write_browser_bundle(const char *js_bundle_path,
     fseek(basef, 0, SEEK_END);
     long base_size = ftell(basef);
     fseek(basef, 0, SEEK_SET);
-    char *base_src = (char *)malloc((size_t)base_size + 1);
+    uint8_t *base_src = (uint8_t *)malloc((size_t)base_size);
     if (!base_src) { fclose(basef); return -1; }
-    fread(base_src, 1, (size_t)base_size, basef);
+    size_t base_read = fread(base_src, 1, (size_t)base_size, basef);
     fclose(basef);
-    base_src[base_size] = '\0';
 
-    /* Write the JS bundle */
-    FILE *jsf = fopen(js_bundle_path, "w");
+    /* Write the JS bundle (binary mode — Emscripten output contains embedded nulls) */
+    FILE *jsf = fopen(js_bundle_path, "wb");
     if (!jsf) {
         fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
                 js_bundle_path, strerror(errno));
@@ -381,7 +381,7 @@ static int write_browser_bundle(const char *js_bundle_path,
               "})();\n\n", jsf);
     }
 
-    fputs(base_src, jsf);
+    fwrite(base_src, 1, base_read, jsf);
     fclose(jsf);
     free(base_src);
 
@@ -430,7 +430,7 @@ static int write_browser_bundle(const char *js_bundle_path,
         js_base);
     fclose(htmlf);
 
-    printf("Browser export: %s  %s\n", js_bundle_path, html_path);
+    printf("Browser export: %s  %s\n  (from: %s)\n", js_bundle_path, html_path, src_file);
     return 0;
 }
 
@@ -720,7 +720,8 @@ int main(int argc, char **argv)
                 } else {
                     if (browser_mode) {
                         ret = write_browser_bundle(precompile_output,
-                                                   bc, bc_size, NULL, exe_dir);
+                                                   bc, bc_size, NULL, exe_dir,
+                                                   argv[2]);
                     } else {
                         FILE *f = fopen(precompile_output, "wb");
                         if (!f) {
