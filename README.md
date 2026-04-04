@@ -78,6 +78,27 @@ Both produce a `.qjs` file. You can specify a different output with `-o`:
 neobasic -p myprogram.nb -o dist/myprogram.qjs
 ```
 
+### Export for the browser
+
+The `--browser` flag works with both `-c` and `-p` to produce a self-contained browser bundle — a `.js` file containing Emscripten-compiled QuickJS + Raylib + the embedded program, plus a minimal `.html` file:
+
+```bash
+# JavaScript source bundle (-c mode)
+neobasic -c myprogram.nb --browser
+# → myprogram.js  myprogram.html
+
+# Bytecode bundle (-p mode — slightly faster startup)
+neobasic -p myprogram.nb --browser
+# → myprogram.js  myprogram.html
+
+# Custom output name
+neobasic -c myprogram.nb --browser -o web/myprogram.js
+```
+
+Open the `.html` file in any WebGL-capable browser. No install, no server required.
+
+> **Prerequisite:** `dist/neobasic_browser_base.js` must exist. Run `bash interpreter/build_browser.sh` once to generate it (requires Emscripten SDK, `lib/raylib-5.0/`, and `lib/quickjs-2025-09-13/`).
+
 ### Run a NeoBasic program
 
 ```bash
@@ -96,8 +117,10 @@ neobasic -r myprogram.qjs
 | Command | Behaviour |
 |---|---|
 | `neobasic -c file.nb [-o out.js]` | Compile `.nb` to `.js` |
+| `neobasic -c file.nb --browser [-o out.js]` | Compile to browser bundle (`.js` + `.html`) |
 | `neobasic -p file.nb [-o out.qjs]` | Compile `.nb` to QuickJS bytecode (`.qjs`) |
 | `neobasic -p file.js [-o out.qjs]` | Compile an existing `.js` to QuickJS bytecode |
+| `neobasic -p file.nb --browser [-o out.js]` | Compile to browser bundle with embedded bytecode |
 | `neobasic -r file.nb` | Compile in memory and run immediately — **no file is written** |
 | `neobasic -r file.js` | Run a JavaScript file directly |
 | `neobasic -r file.qjs` | Run a precompiled QuickJS bytecode file |

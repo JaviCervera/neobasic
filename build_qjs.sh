@@ -2,11 +2,12 @@
 # =================================================================
 # build_qjs.sh  --  Build all QuickJS-related artefacts:
 #
-#   dist/neobasic.js       NeoBasic compiler CLI (runs under qjs)
-#   dist/neobasic.qjs      Precompiled bytecode of neobasic.js
-#   dist/neobasic[.exe]    Custom QuickJS binary with native Raylib
+#   dist/neobasic.js              NeoBasic compiler CLI (runs under qjs)
+#   dist/neobasic.qjs             Precompiled bytecode of neobasic.js
+#   dist/neobasic[.exe]           Custom QuickJS binary with native Raylib
+#   dist/neobasic_browser_base.js Browser runtime base (requires emcc)
 #
-# Prerequisites (both targets):
+# Prerequisites (all targets):
 #   Node.js + npm          (for neobasic.js)
 #   Python 3               (for gen_qjs_module.py)
 #   gcc                    (for neobasic)
@@ -15,6 +16,9 @@
 #   Linux  : libX11-dev, libXrandr-dev, libXinerama-dev,
 #             libXcursor-dev, libXi-dev, libGL-dev (or mesa-dev)
 #   macOS  : Xcode command-line tools
+#
+# Additional prerequisites for browser base (step 4, skipped if absent):
+#   Emscripten SDK (emcc on PATH) -- https://emscripten.org/
 #
 # Sources expected at:
 #   lib/quickjs-2025-09-13/
@@ -30,7 +34,7 @@ need() {
 }
 
 # ── Step 1: build neobasic.js ────────────────────────────────────
-echo "=== [1/2] Building neobasic.js ==="
+echo "=== [1/4] Building neobasic.js ==="
 need node  "Install Node.js (https://nodejs.org/)"
 need npm   "Install Node.js (https://nodejs.org/)"
 need npx   "Install Node.js (https://nodejs.org/)"
@@ -53,7 +57,7 @@ echo "    dist/neobasic.js  OK"
 
 # ── Step 2: build neobasic ───────────────────────────────────────
 echo ""
-echo "=== [2/3] Building neobasic ==="
+echo "=== [2/4] Building neobasic ==="
 need gcc     "Install gcc (Linux: build-essential; macOS: xcode-select --install)"
 need python3 "Install Python 3 (https://python.org/)"
 
@@ -70,8 +74,18 @@ EXE_EXT=""
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE_EXT=".exe" ;; esac
 
 echo ""
-echo "=== [3/3] Precompiling neobasic.js to neobasic.qjs ==="
+echo "=== [3/4] Precompiling neobasic.js to neobasic.qjs ==="
 "$SCRIPT_DIR/dist/neobasic$EXE_EXT" -p "$SCRIPT_DIR/dist/neobasic.js" -o "$SCRIPT_DIR/dist/neobasic.qjs"
+
+# ── Step 4: build browser base (requires Emscripten, optional) ──
+echo ""
+echo "=== [4/4] Building browser base (neobasic_browser_base.js) ==="
+if command -v emcc >/dev/null 2>&1; then
+    bash "$SCRIPT_DIR/interpreter/build_browser.sh"
+else
+    echo "  SKIPPED: emcc not found. Install the Emscripten SDK to enable browser export."
+    echo "  https://emscripten.org/docs/getting_started/downloads.html"
+fi
 
 # ── Done ─────────────────────────────────────────────────────────
 echo ""
@@ -79,3 +93,6 @@ echo "=== Build complete ==="
 echo "    dist/neobasic.js"
 echo "    dist/neobasic.qjs"
 echo "    dist/neobasic$EXE_EXT"
+if [ -f "$SCRIPT_DIR/dist/neobasic_browser_base.js" ]; then
+    echo "    dist/neobasic_browser_base.js"
+fi

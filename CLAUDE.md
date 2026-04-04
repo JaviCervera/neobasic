@@ -597,6 +597,69 @@ dist\neobasic.exe -r myprogram.js    # Windows
 ./dist/neobasic -r myprogram.js      # Linux/macOS
 ```
 
+### Phase 13 — Browser Export (`--browser`)
+
+**Goal:** Allow `-c` and `-p` to emit a self-contained browser bundle: a single `.js` file (Emscripten-compiled QuickJS + Raylib + embedded program) and a minimal `.html` file. No Node.js or external runtime needed — open the `.html` in a browser.
+
+#### Architecture
+
+- **`interpreter/neobasic_browser.c`** — Emscripten entry point. Exports two functions with `EMSCRIPTEN_KEEPALIVE`:
+  - `nb_run_js(const char*)` — accepts a JavaScript string; evaluates it inside a QuickJS context that has `raylib_native` and `globalThis.std` set up.
+  - `nb_run_bytecode(const uint8_t*, size_t)` — accepts QuickJS bytecode; runs it via the same three-step sequence (JS_ResolveModule → js_module_set_import_meta → JS_EvalFunction).
+
+- **`interpreter/build_browser.sh`** — Emscripten build script; produces `dist/neobasic_browser_base.js` (WASM embedded as base64 via `-sSINGLE_FILE=1`). Requires Emscripten SDK. Only needs to be run once (or when the C source changes); committed output can be reused.
+
+- **`dist/neobasic_browser_base.js`** — pre-built Emscripten runtime. Used as the base layer for browser bundles at export time.
+
+#### Usage
+
+```sh
+# Compile .nb → browser bundle (-c mode, JS program)
+./dist/neobasic -c myprogram.nb --browser
+# outputs: myprogram.js  myprogram.html
+
+# Precompile .nb → browser bundle with embedded bytecode (-p mode)
+./dist/neobasic -p myprogram.nb --browser
+# outputs: myprogram.js  myprogram.html
+
+# Custom output name
+./dist/neobasic -p myprogram.nb --browser -o dist/myprogram.js
+```
+
+Open the `.html` file in a browser that supports WebGL/WebAssembly.
+
+#### Bundle format (`.js` output)
+
+```
+// Preamble: sets Module.canvas and Module.onRuntimeInitialized
+var Module = typeof Module !== 'undefined' ? Module : {};
+Module.canvas = ...;
+(function () {
+  // For -c: __nb_prog is the raw JS source (JSON-escaped string)
+  // For -p: __nb_prog is base64-encoded QuickJS bytecode
+  Module.onRuntimeInitialized = function () {
+    // Calls Module.ccall('nb_run_js'|'nb_run_bytecode', ..., { async: true })
+  };
+})();
+
+// Base Emscripten runtime (neobasic_browser_base.js appended here)
+```
+
+#### Prerequisites
+
+- Run `bash interpreter/build_browser.sh` once to generate `dist/neobasic_browser_base.js`. Requires:
+  - Emscripten SDK (`emcc` on PATH)
+  - Raylib source at `lib/raylib-5.0/`
+  - QuickJS source at `lib/quickjs-2025-09-13/`
+
+#### Implementation notes
+
+- `-c --browser` is handled entirely in **`src/cli.ts`** (TypeScript) since the NeoBasic→JS compilation happens there.
+- `-p --browser` is handled in **`interpreter/neobasic.c`**: after bytecode is generated in Phase 2b, it calls `write_browser_bundle()` (with base64 encoding) instead of writing a `.qjs` file. Default output extension is `.js` (not `.qjs`) when `--browser` is set.
+- `write_browser_bundle()` reads `{exe_dir}/neobasic_browser_base.js` at export time; if missing, it prints a clear error pointing to `build_browser.sh`.
+- The `--browser` flag is supported by both `-c` (via TypeScript) and `-p` (via C). For `-c --browser`, `src/cli.ts` reads and appends the base runtime. For `-p --browser`, `neobasic.c` does the same in C.
+- ASYNCIFY is required (Raylib web platform calls `emscripten_sleep` in `WindowShouldClose`); `nb_run_js` / `nb_run_bytecode` must be called via `Module.ccall(..., { async: true })`.
+
 ## Bundled modules
 
 ### `core`

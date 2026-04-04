@@ -225,8 +225,8 @@ static void get_exe_dir(const char *argv0, char *buf, size_t buf_size)
 
 static void help(void) {
     printf("NeoBasic " CONFIG_VERSION "\n"
-           "usage: " PROG_NAME " -c <file.nb> [-o <output.js>]\n"
-           "       " PROG_NAME " -p <file.nb> [-o <output.qjs>]\n"
+           "usage: " PROG_NAME " -c <file.nb> [-o <output.js>] [--browser]\n"
+           "       " PROG_NAME " -p <file.nb|file.js> [-o <output>] [--browser]\n"
            "       " PROG_NAME " -r <file.nb|file.js|file.qjs>\n"
            "       " PROG_NAME " [args...]\n"
            "\n"
@@ -234,6 +234,9 @@ static void help(void) {
            "                        (writes <file>.js next to the source)\n"
            "  -p <file.nb>          Compile to QuickJS bytecode (.qjs)\n"
            "                        (writes <file>.qjs next to the source)\n"
+           "  -p <file.js>          Compile existing JS to QuickJS bytecode (.qjs)\n"
+           "  --browser             With -c or -p: export a browser bundle (.js + .html)\n"
+           "                        instead of a plain .js / .qjs file\n"
            "  -o <output>           Output path for -c or -p\n"
            "  -r <file.nb>          Compile and run a NeoBasic file in one step\n"
            "                        (no .js file is written to disk)\n"
@@ -253,6 +256,182 @@ static int path_has_suffix(const char *path, const char *suffix)
     size_t plen = strlen(path);
     size_t slen = strlen(suffix);
     return plen >= slen && strcmp(path + plen - slen, suffix) == 0;
+}
+
+/* ── Base64 encoder (for -p --browser bytecode embedding) ────────────────── */
+static const char b64_chars[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/* Returns a heap-allocated base64 string (caller must free).
+ * Returns NULL on allocation failure. */
+static char *base64_encode(const uint8_t *data, size_t len)
+{
+    size_t enc_len = ((len + 2) / 3) * 4 + 1;
+    char *out = (char *)malloc(enc_len);
+    if (!out) return NULL;
+    size_t i, j = 0;
+    for (i = 0; i + 2 < len; i += 3) {
+        out[j++] = b64_chars[(data[i]     >> 2) & 0x3f];
+        out[j++] = b64_chars[((data[i]    & 0x3)  << 4) | ((data[i+1] >> 4) & 0xf)];
+        out[j++] = b64_chars[((data[i+1]  & 0xf)  << 2) | ((data[i+2] >> 6) & 0x3)];
+        out[j++] = b64_chars[data[i+2]    & 0x3f];
+    }
+    if (i < len) {
+        out[j++] = b64_chars[(data[i] >> 2) & 0x3f];
+        if (i + 1 < len) {
+            out[j++] = b64_chars[((data[i] & 0x3) << 4) | ((data[i+1] >> 4) & 0xf)];
+            out[j++] = b64_chars[(data[i+1] & 0xf) << 2];
+        } else {
+            out[j++] = b64_chars[(data[i] & 0x3) << 4];
+            out[j++] = '=';
+        }
+        out[j++] = '=';
+    }
+    out[j] = '\0';
+    return out;
+}
+
+/* Write a browser export bundle (.js + .html).
+ *
+ * js_bundle_path  — output .js path (may already have .js extension)
+ * bc              — bytecode buffer (NULL for JS-string mode)
+ * bc_len          — bytecode length
+ * js_code         — compiled JS string (NULL for bytecode mode)
+ * exe_dir         — directory containing the neobasic binary
+ *
+ * Returns 0 on success, -1 on error.
+ */
+static int write_browser_bundle(const char *js_bundle_path,
+                                const uint8_t *bc, size_t bc_len,
+                                const char *js_code,
+                                const char *exe_dir)
+{
+    /* Locate the browser base runtime */
+    char base_path[4096];
+    snprintf(base_path, sizeof(base_path), "%s/neobasic_browser_base.js", exe_dir);
+    FILE *basef = fopen(base_path, "rb");
+    if (!basef) {
+        fprintf(stderr, PROG_NAME ": browser runtime not found: %s\n", base_path);
+        fprintf(stderr, PROG_NAME ": run  bash interpreter/build_browser.sh  first"
+                        " (requires Emscripten)\n");
+        return -1;
+    }
+    fseek(basef, 0, SEEK_END);
+    long base_size = ftell(basef);
+    fseek(basef, 0, SEEK_SET);
+    char *base_src = (char *)malloc((size_t)base_size + 1);
+    if (!base_src) { fclose(basef); return -1; }
+    fread(base_src, 1, (size_t)base_size, basef);
+    fclose(basef);
+    base_src[base_size] = '\0';
+
+    /* Write the JS bundle */
+    FILE *jsf = fopen(js_bundle_path, "w");
+    if (!jsf) {
+        fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
+                js_bundle_path, strerror(errno));
+        free(base_src);
+        return -1;
+    }
+
+    if (bc) {
+        /* Bytecode mode: embed as base64 */
+        char *b64 = base64_encode(bc, bc_len);
+        if (!b64) { fclose(jsf); free(base_src); return -1; }
+        fprintf(jsf,
+            "var Module = typeof Module !== 'undefined' ? Module : {};\n"
+            "Module.canvas = Module.canvas || document.getElementById('canvas');\n"
+            "(function () {\n"
+            "  var __nb_prog = \"%s\";\n"
+            "  var _orig = Module.onRuntimeInitialized;\n"
+            "  Module.onRuntimeInitialized = function () {\n"
+            "    if (_orig) _orig.call(this);\n"
+            "    var bin = atob(__nb_prog);\n"
+            "    var bytes = new Uint8Array(bin.length);\n"
+            "    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);\n"
+            "    var ptr = Module._malloc(bytes.length);\n"
+            "    Module.HEAPU8.set(bytes, ptr);\n"
+            "    Module.ccall('nb_run_bytecode', null, ['number', 'number'],\n"
+            "                 [ptr, bytes.length], { async: true });\n"
+            "    Module._free(ptr);\n"
+            "  };\n"
+            "})();\n\n",
+            b64);
+        free(b64);
+    } else {
+        /* JS string mode: JSON-escape the program source */
+        /* Simple escaping: replace \ with \\ and " with \" and newlines */
+        fputs("var Module = typeof Module !== 'undefined' ? Module : {};\n"
+              "Module.canvas = Module.canvas || document.getElementById('canvas');\n"
+              "(function () {\n"
+              "  var __nb_prog = \"", jsf);
+        for (const char *p = js_code; *p; p++) {
+            if      (*p == '\\') fputs("\\\\", jsf);
+            else if (*p == '"')  fputs("\\\"", jsf);
+            else if (*p == '\n') fputs("\\n",  jsf);
+            else if (*p == '\r') fputs("\\r",  jsf);
+            else                 fputc(*p, jsf);
+        }
+        fputs("\";\n"
+              "  var _orig = Module.onRuntimeInitialized;\n"
+              "  Module.onRuntimeInitialized = function () {\n"
+              "    if (_orig) _orig.call(this);\n"
+              "    Module.ccall('nb_run_js', null, ['string'], [__nb_prog], { async: true });\n"
+              "  };\n"
+              "})();\n\n", jsf);
+    }
+
+    fputs(base_src, jsf);
+    fclose(jsf);
+    free(base_src);
+
+    /* Write the HTML file */
+    char html_path[4096];
+    size_t jlen = strlen(js_bundle_path);
+    if (jlen > 3 && strcmp(js_bundle_path + jlen - 3, ".js") == 0)
+        snprintf(html_path, sizeof(html_path), "%.*s.html", (int)(jlen - 3), js_bundle_path);
+    else
+        snprintf(html_path, sizeof(html_path), "%s.html", js_bundle_path);
+
+    /* Extract basename of JS for the <script src="..."> tag */
+    const char *js_base = strrchr(js_bundle_path, '/');
+#if defined(_WIN32)
+    {
+        const char *bs = strrchr(js_bundle_path, '\\');
+        if (bs && (!js_base || bs > js_base)) js_base = bs;
+    }
+#endif
+    js_base = js_base ? js_base + 1 : js_bundle_path;
+
+    FILE *htmlf = fopen(html_path, "w");
+    if (!htmlf) {
+        fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
+                html_path, strerror(errno));
+        return -1;
+    }
+    fprintf(htmlf,
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head>\n"
+        "  <meta charset=\"utf-8\">\n"
+        "  <title>NeoBasic</title>\n"
+        "  <style>\n"
+        "    * { margin: 0; padding: 0; }\n"
+        "    body { background: #000; display: flex; justify-content: center;"
+               " align-items: center; height: 100vh; }\n"
+        "    canvas { display: block; }\n"
+        "  </style>\n"
+        "</head>\n"
+        "<body>\n"
+        "  <canvas id=\"canvas\"></canvas>\n"
+        "  <script src=\"%s\"></script>\n"
+        "</body>\n"
+        "</html>\n",
+        js_base);
+    fclose(htmlf);
+
+    printf("Browser export: %s  %s\n", js_bundle_path, html_path);
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -304,6 +483,7 @@ int main(int argc, char **argv)
     int run_mode_nb = 0; /* -r .nb or -p .nb: compile in memory then act on result */
     int run_is_qjs  = 0; /* Phase 1 script is bytecode (.qjs) */
     int precompile_mode = 0; /* -p: write bytecode file instead of executing */
+    int browser_mode = 0;   /* --browser: emit browser bundle instead */
     char precompile_output[4096] = "";
     char precompile_from_file[4096] = ""; /* -p file.js: read JS directly (no compiler) */
 
@@ -359,17 +539,23 @@ int main(int argc, char **argv)
         }
 
     } else if (is_precompile) {
-        /* -p: compile to QuickJS bytecode (.qjs) */
+        /* -p: compile to QuickJS bytecode (.qjs), or browser bundle with --browser */
         const char *p_input = argv[2];
         precompile_mode = 1;
 
-        /* Default output: replace .nb/.js ext with .qjs, or append .qjs */
+        /* Check for --browser flag */
+        for (int i = 3; i < argc; i++) {
+            if (strcmp(argv[i], "--browser") == 0) { browser_mode = 1; break; }
+        }
+
+        /* Default output: replace .nb/.js ext with .qjs (or .js in browser mode) */
+        const char *out_ext = browser_mode ? ".js" : ".qjs";
         size_t p_len = strlen(p_input);
         if ((p_len > 3 && strcmp(p_input + p_len - 3, ".nb") == 0) ||
             (p_len > 3 && strcmp(p_input + p_len - 3, ".js") == 0))
-            snprintf(precompile_output, sizeof(precompile_output), "%.*s.qjs", (int)(p_len - 3), p_input);
+            snprintf(precompile_output, sizeof(precompile_output), "%.*s%s", (int)(p_len - 3), p_input, out_ext);
         else
-            snprintf(precompile_output, sizeof(precompile_output), "%s.qjs", p_input);
+            snprintf(precompile_output, sizeof(precompile_output), "%s%s", p_input, out_ext);
 
         /* Override with -o if provided */
         for (int i = 3; i < argc - 1; i++) {
@@ -532,15 +718,20 @@ int main(int argc, char **argv)
                     fprintf(stderr, PROG_NAME ": failed to serialize bytecode\n");
                     ret = 1;
                 } else {
-                    FILE *f = fopen(precompile_output, "wb");
-                    if (!f) {
-                        fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
-                                precompile_output, strerror(errno));
-                        ret = 1;
+                    if (browser_mode) {
+                        ret = write_browser_bundle(precompile_output,
+                                                   bc, bc_size, NULL, exe_dir);
                     } else {
-                        fwrite(bc, 1, bc_size, f);
-                        fclose(f);
-                        printf("Compiled %s -> %s\n", argv[2], precompile_output);
+                        FILE *f = fopen(precompile_output, "wb");
+                        if (!f) {
+                            fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
+                                    precompile_output, strerror(errno));
+                            ret = 1;
+                        } else {
+                            fwrite(bc, 1, bc_size, f);
+                            fclose(f);
+                            printf("Compiled %s -> %s\n", argv[2], precompile_output);
+                        }
                     }
                     js_free(ctx, bc);
                 }

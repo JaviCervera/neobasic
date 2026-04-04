@@ -1,3 +1,2 @@
 - Zip support and embed resources in .js
-- Browser support for QuickJS
 - QuickJS was added to lib/quickjs-2025-09-13, the original commit containing it is vanilla quickjs without modifications. On further commits, raylib was modified to support dynamically loaded modules, but Raylib is bundled directly instead of being compiled as a separate module that is loaded dynamically. Try to build using vanilla QuickJS installation. Also, there should probably be no need for core and raylib in neo_mods, they could be embedded in the compiler directly.
