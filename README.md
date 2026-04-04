@@ -35,8 +35,9 @@ npm install
 build_qjs.bat
 ```
 
-This produces two artefacts in `dist/`:
-- **`neobasic.js`** — the compiler CLI, runs under any QuickJS installation
+This produces three artefacts in `dist/`:
+- **`neobasic.js`** — the compiler CLI source bundle
+- **`neobasic.qjs`** — precompiled bytecode of `neobasic.js` (used automatically for faster startup)
 - **`neobasic`** / **`neobasic.exe`** — the full runtime binary (QuickJS + native Raylib)
 
 ### Run the tests
@@ -59,14 +60,35 @@ You can specify a different output path with `-o`:
 neobasic -c myprogram.nb -o output/myprogram.js
 ```
 
+### Precompile to bytecode
+
+For faster startup and distribution without source, compile to a QuickJS bytecode file:
+
+```bash
+# From a NeoBasic source file
+neobasic -p myprogram.nb
+
+# From an already-compiled .js file
+neobasic -p myprogram.js
+```
+
+Both produce a `.qjs` file. You can specify a different output with `-o`:
+
+```bash
+neobasic -p myprogram.nb -o dist/myprogram.qjs
+```
+
 ### Run a NeoBasic program
 
 ```bash
-# Compile and run in one step (no .js file is written to disk)
+# Compile and run in one step (no file is written to disk)
 neobasic -r myprogram.nb
 
 # Run a previously compiled .js file
 neobasic -r myprogram.js
+
+# Run a precompiled bytecode .qjs file
+neobasic -r myprogram.qjs
 ```
 
 ### neobasic binary modes
@@ -74,8 +96,11 @@ neobasic -r myprogram.js
 | Command | Behaviour |
 |---|---|
 | `neobasic -c file.nb [-o out.js]` | Compile `.nb` to `.js` |
-| `neobasic -r file.nb` | Compile in memory and run immediately — **no `.js` file is written** |
+| `neobasic -p file.nb [-o out.qjs]` | Compile `.nb` to QuickJS bytecode (`.qjs`) |
+| `neobasic -p file.js [-o out.qjs]` | Compile an existing `.js` to QuickJS bytecode |
+| `neobasic -r file.nb` | Compile in memory and run immediately — **no file is written** |
 | `neobasic -r file.js` | Run a JavaScript file directly |
+| `neobasic -r file.qjs` | Run a precompiled QuickJS bytecode file |
 | `neobasic [args...]` | Run `program.js` in the current directory, forwarding all args |
 
 ### Run the examples

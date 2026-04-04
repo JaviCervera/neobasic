@@ -3,6 +3,7 @@
 # build_qjs.sh  --  Build all QuickJS-related artefacts:
 #
 #   dist/neobasic.js       NeoBasic compiler CLI (runs under qjs)
+#   dist/neobasic.qjs      Precompiled bytecode of neobasic.js
 #   dist/neobasic[.exe]    Custom QuickJS binary with native Raylib
 #
 # Prerequisites (both targets):
@@ -52,7 +53,7 @@ echo "    dist/neobasic.js  OK"
 
 # ── Step 2: build neobasic ───────────────────────────────────────
 echo ""
-echo "=== [2/2] Building neobasic ==="
+echo "=== [2/3] Building neobasic ==="
 need gcc     "Install gcc (Linux: build-essential; macOS: xcode-select --install)"
 need python3 "Install Python 3 (https://python.org/)"
 
@@ -64,11 +65,17 @@ fi
 
 bash "$BUILD_NBQJS"
 
-# ── Done ─────────────────────────────────────────────────────────
+# ── Step 3: precompile neobasic.js → neobasic.qjs ───────────────
 EXE_EXT=""
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE_EXT=".exe" ;; esac
 
 echo ""
+echo "=== [3/3] Precompiling neobasic.js to neobasic.qjs ==="
+"$SCRIPT_DIR/dist/neobasic$EXE_EXT" -p "$SCRIPT_DIR/dist/neobasic.js" -o "$SCRIPT_DIR/dist/neobasic.qjs"
+
+# ── Done ─────────────────────────────────────────────────────────
+echo ""
 echo "=== Build complete ==="
 echo "    dist/neobasic.js"
+echo "    dist/neobasic.qjs"
 echo "    dist/neobasic$EXE_EXT"

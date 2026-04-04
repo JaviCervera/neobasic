@@ -580,7 +580,7 @@ def generate(bridge_src, nbm_path, out_file):
 if __name__ == '__main__':
     build_dir  = os.path.dirname(os.path.abspath(__file__))
     bridge_path = os.path.join(build_dir, 'raylib_bridge.c')
-    nbm_path    = os.path.join(build_dir, '..', 'raylib.nbm')
+    nbm_path    = os.path.join(build_dir, '..', 'neo_mods', 'raylib', 'raylib.nbm')
     out_path    = os.path.join(build_dir, 'raylib_qjs_module.c')
 
     with open(bridge_path, 'r', encoding='utf-8', errors='replace') as f:

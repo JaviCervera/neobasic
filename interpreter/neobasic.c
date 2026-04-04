@@ -120,6 +120,42 @@ static int eval_file(JSContext *ctx, const char *filename, int module)
     return ret;
 }
 
+/* Load and execute a precompiled QuickJS bytecode (.qjs) file. */
+static int eval_bytecode_file(JSContext *ctx, const char *filename)
+{
+    size_t buf_len;
+    uint8_t *buf = js_load_file(ctx, &buf_len, filename);
+    if (!buf) {
+        perror(filename);
+        exit(1);
+    }
+    JSValue obj = JS_ReadObject(ctx, buf, buf_len, JS_READ_OBJ_BYTECODE);
+    js_free(ctx, buf);
+    if (JS_IsException(obj)) {
+        js_std_dump_error(ctx);
+        return -1;
+    }
+    if (JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE) {
+        /* Resolve imports (fills rme->module pointers) before EvalFunction
+         * walks them in js_create_module_function. */
+        if (JS_ResolveModule(ctx, obj) < 0) {
+            js_std_dump_error(ctx);
+            JS_FreeValue(ctx, obj);
+            return -1;
+        }
+        /* Set import.meta.url so module-loader.ts can find neo_mods/. */
+        js_module_set_import_meta(ctx, obj, FALSE, TRUE);
+    }
+    JSValue result = JS_EvalFunction(ctx, obj); /* consumes obj */
+    if (JS_IsException(result)) {
+        js_std_dump_error(ctx);
+        JS_FreeValue(ctx, result);
+        return -1;
+    }
+    JS_FreeValue(ctx, result);
+    return 0;
+}
+
 static JSContext *JS_NewCustomContext(JSRuntime *rt)
 {
     JSContext *ctx;
@@ -190,19 +226,23 @@ static void get_exe_dir(const char *argv0, char *buf, size_t buf_size)
 static void help(void) {
     printf("NeoBasic " CONFIG_VERSION "\n"
            "usage: " PROG_NAME " -c <file.nb> [-o <output.js>]\n"
-           "       " PROG_NAME " -r <file.nb|file.js>\n"
+           "       " PROG_NAME " -p <file.nb> [-o <output.qjs>]\n"
+           "       " PROG_NAME " -r <file.nb|file.js|file.qjs>\n"
            "       " PROG_NAME " [args...]\n"
            "\n"
            "  -c <file.nb>          Compile a NeoBasic source file to JavaScript\n"
            "                        (writes <file>.js next to the source)\n"
-           "  -o <output.js>        Output path for -c (default: <input>.js)\n"
+           "  -p <file.nb>          Compile to QuickJS bytecode (.qjs)\n"
+           "                        (writes <file>.qjs next to the source)\n"
+           "  -o <output>           Output path for -c or -p\n"
            "  -r <file.nb>          Compile and run a NeoBasic file in one step\n"
            "                        (no .js file is written to disk)\n"
            "  -r <file.js>          Run a JavaScript file directly\n"
+           "  -r <file.qjs>         Run a precompiled QuickJS bytecode file\n"
            "  -h, --help            Show this help message\n"
            "  -v, --version         Show version\n"
            "\n"
-           "  When called without -c or -r, runs program.js in the current\n"
+           "  When called without -c, -p, or -r, runs program.js in the current\n"
            "  directory and forwards all arguments to it.\n");
     exit(0);
 }
@@ -217,8 +257,9 @@ static int path_has_suffix(const char *path, const char *suffix)
 
 int main(int argc, char **argv)
 {
-    int is_compile = (argc >= 2 && strcmp(argv[1], "-c") == 0);
-    int is_run     = (argc >= 2 && strcmp(argv[1], "-r") == 0);
+    int is_compile    = (argc >= 2 && strcmp(argv[1], "-c") == 0);
+    int is_run        = (argc >= 2 && strcmp(argv[1], "-r") == 0);
+    int is_precompile = (argc >= 2 && strcmp(argv[1], "-p") == 0);
     int is_help    = (argc >= 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0));
     int is_version = (argc >= 2 && (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "-v") == 0));
 
@@ -229,12 +270,29 @@ int main(int argc, char **argv)
         fprintf(stderr, PROG_NAME ": -r requires a filename\n");
         return 1;
     }
+    if (is_precompile && argc < 3) {
+        fprintf(stderr, PROG_NAME ": -p requires a filename\n");
+        return 1;
+    }
 
-    /* Locate neobasic.js (the bundled compiler) next to this binary */
+    /* Locate compiler script next to this binary: try neobasic.qjs first,
+     * fall back to neobasic.js. */
     char exe_dir[4096];
     get_exe_dir(argv[0], exe_dir, sizeof(exe_dir));
-    char neobasic_js[4096];
-    snprintf(neobasic_js, sizeof(neobasic_js), "%s/neobasic.js", exe_dir);
+    char neobasic_compiler[4096];
+    int compiler_is_qjs = 0;
+    {
+        char tmp[4096];
+        snprintf(tmp, sizeof(tmp), "%s/neobasic.qjs", exe_dir);
+        FILE *f = fopen(tmp, "rb");
+        if (f) {
+            fclose(f);
+            snprintf(neobasic_compiler, sizeof(neobasic_compiler), "%s", tmp);
+            compiler_is_qjs = 1;
+        } else {
+            snprintf(neobasic_compiler, sizeof(neobasic_compiler), "%s/neobasic.js", exe_dir);
+        }
+    }
 
     /* Determine the script to run and the argv array QuickJS will see.
      *
@@ -243,14 +301,19 @@ int main(int argc, char **argv)
      * the script and any user-visible args map correctly.
      */
     char script_path[4096];
-    int run_mode_nb = 0; /* -r .nb: compile in memory then exec */
+    int run_mode_nb = 0; /* -r .nb or -p .nb: compile in memory then act on result */
+    int run_is_qjs  = 0; /* Phase 1 script is bytecode (.qjs) */
+    int precompile_mode = 0; /* -p: write bytecode file instead of executing */
+    char precompile_output[4096] = "";
+    char precompile_from_file[4096] = ""; /* -p file.js: read JS directly (no compiler) */
 
     int helper_argc;
     char **helper_argv;
 
     if (is_compile) {
         /* -c mode: forward all original args to the compiler */
-        snprintf(script_path, sizeof(script_path), "%s", neobasic_js);
+        snprintf(script_path, sizeof(script_path), "%s", neobasic_compiler);
+        run_is_qjs = compiler_is_qjs;
         helper_argc = argc;
         helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
         if (!helper_argv) goto oom;
@@ -263,8 +326,9 @@ int main(int argc, char **argv)
         if (path_has_suffix(run_file, ".nb")) {
             /* Compile in memory, then execute */
             run_mode_nb = 1;
-            snprintf(script_path, sizeof(script_path), "%s", neobasic_js);
-            /* Compiler args: neobasic.js -c <file.nb> --emit */
+            snprintf(script_path, sizeof(script_path), "%s", neobasic_compiler);
+            run_is_qjs = compiler_is_qjs;
+            /* Compiler args: neobasic[.qjs|.js] -c <file.nb> --emit */
             helper_argc = 4;
             helper_argv = (char **)malloc(4 * sizeof(char *));
             if (!helper_argv) goto oom;
@@ -272,6 +336,16 @@ int main(int argc, char **argv)
             helper_argv[1] = "-c";
             helper_argv[2] = (char *)run_file;
             helper_argv[3] = "--emit";
+
+        } else if (path_has_suffix(run_file, ".qjs")) {
+            /* Precompiled bytecode: run directly (no compiler needed) */
+            run_is_qjs = 1;
+            snprintf(script_path, sizeof(script_path), "%s", run_file);
+            helper_argc = argc - 2;
+            helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
+            if (!helper_argv) goto oom;
+            helper_argv[0] = script_path;
+            for (int i = 1; i < helper_argc; i++) helper_argv[i] = argv[i + 2];
 
         } else {
             /* .js (or other extension): run directly */
@@ -284,9 +358,61 @@ int main(int argc, char **argv)
             for (int i = 1; i < helper_argc; i++) helper_argv[i] = argv[i + 2];
         }
 
+    } else if (is_precompile) {
+        /* -p: compile to QuickJS bytecode (.qjs) */
+        const char *p_input = argv[2];
+        precompile_mode = 1;
+
+        /* Default output: replace .nb/.js ext with .qjs, or append .qjs */
+        size_t p_len = strlen(p_input);
+        if ((p_len > 3 && strcmp(p_input + p_len - 3, ".nb") == 0) ||
+            (p_len > 3 && strcmp(p_input + p_len - 3, ".js") == 0))
+            snprintf(precompile_output, sizeof(precompile_output), "%.*s.qjs", (int)(p_len - 3), p_input);
+        else
+            snprintf(precompile_output, sizeof(precompile_output), "%s.qjs", p_input);
+
+        /* Override with -o if provided */
+        for (int i = 3; i < argc - 1; i++) {
+            if (strcmp(argv[i], "-o") == 0) {
+                snprintf(precompile_output, sizeof(precompile_output), "%s", argv[i + 1]);
+                break;
+            }
+        }
+
+        if (path_has_suffix(p_input, ".js")) {
+            /* JavaScript input: compile directly to bytecode (no NeoBasic compiler needed) */
+            snprintf(precompile_from_file, sizeof(precompile_from_file), "%s", p_input);
+            snprintf(script_path, sizeof(script_path), "%s", p_input);
+            helper_argc = 1;
+            helper_argv = (char **)malloc(sizeof(char *));
+            if (!helper_argv) goto oom;
+            helper_argv[0] = script_path;
+        } else {
+            /* .nb or other: compile via NeoBasic compiler using --emit */
+            run_mode_nb = 1;
+            snprintf(script_path, sizeof(script_path), "%s", neobasic_compiler);
+            run_is_qjs = compiler_is_qjs;
+            helper_argc = 4;
+            helper_argv = (char **)malloc(4 * sizeof(char *));
+            if (!helper_argv) goto oom;
+            helper_argv[0] = script_path;
+            helper_argv[1] = "-c";
+            helper_argv[2] = (char *)p_input;
+            helper_argv[3] = "--emit";
+        }
+
     } else {
-        /* Default: run program.js in cwd, forward all original args */
-        snprintf(script_path, sizeof(script_path), "program.js");
+        /* Default: try program.qjs first, fall back to program.js */
+        {
+            FILE *f = fopen("program.qjs", "rb");
+            if (f) {
+                fclose(f);
+                snprintf(script_path, sizeof(script_path), "program.qjs");
+                run_is_qjs = 1;
+            } else {
+                snprintf(script_path, sizeof(script_path), "program.js");
+            }
+        }
         helper_argc = argc;
         helper_argv = (char **)malloc((size_t)helper_argc * sizeof(char *));
         if (!helper_argv) goto oom;
@@ -305,8 +431,8 @@ int main(int argc, char **argv)
     JS_SetModuleLoaderFunc2(rt, NULL, js_module_loader, js_module_check_attributes, NULL);
     JS_SetHostPromiseRejectionTracker(rt, js_std_promise_rejection_tracker, NULL);
 
-    /* For -r .nb: register __neobasic_emit so the compiler can hand back the
-     * compiled JS string without writing any file to disk. */
+    /* For -r .nb and -p: register __neobasic_emit so the compiler can hand back
+     * the compiled JS string without writing any file to disk. */
     g_emitted_code = JS_UNDEFINED;
     if (run_mode_nb) {
         JSValue global = JS_GetGlobalObject(ctx);
@@ -319,11 +445,19 @@ int main(int argc, char **argv)
     free(helper_argv);
 
     /* ── Phase 1: run script_path (compiler or user program) ─────────── */
-    int ret = eval_file(ctx, script_path, -1);
-    if (ret == 0) js_std_loop(ctx);
+    int ret = 0;
+    if (precompile_from_file[0] != '\0') {
+        /* -p file.js: skip Phase 1, compile JS to bytecode directly in Phase 2b */
+    } else if (run_is_qjs) {
+        ret = eval_bytecode_file(ctx, script_path);
+        if (ret == 0) js_std_loop(ctx);
+    } else {
+        ret = eval_file(ctx, script_path, -1);
+        if (ret == 0) js_std_loop(ctx);
+    }
 
-    /* ── Phase 2 (only for -r .nb): execute the emitted code ─────────── */
-    if (ret == 0 && run_mode_nb) {
+    /* ── Phase 2a: -r .nb — execute the emitted code ─────────────────── */
+    if (ret == 0 && run_mode_nb && !precompile_mode) {
         if (JS_IsUndefined(g_emitted_code)) {
             fprintf(stderr, PROG_NAME ": -r: compiler produced no output for '%s'\n", argv[2]);
             ret = 1;
@@ -344,6 +478,79 @@ int main(int argc, char **argv)
             JS_FreeValue(ctx, g_emitted_code);
             g_emitted_code = JS_UNDEFINED;
         }
+    }
+
+    /* ── Phase 2b: -p — compile to bytecode and write file ───────────── */
+    if (ret == 0 && precompile_mode) {
+        const char *code_str = NULL;
+        size_t code_len = 0;
+        char *file_buf = NULL;
+
+        if (precompile_from_file[0] != '\0') {
+            /* -p file.js: read the JS file directly */
+            file_buf = (char *)js_load_file(ctx, &code_len, precompile_from_file);
+            if (!file_buf) {
+                perror(precompile_from_file);
+                ret = 1;
+            } else {
+                code_str = file_buf;
+            }
+        } else {
+            /* -p file.nb: use JS emitted by the compiler via --emit */
+            if (JS_IsUndefined(g_emitted_code)) {
+                fprintf(stderr, PROG_NAME ": -p: compiler produced no output for '%s'\n", argv[2]);
+                ret = 1;
+            } else {
+                code_str = JS_ToCStringLen(ctx, &code_len, g_emitted_code);
+                if (!code_str) ret = 1;
+            }
+        }
+
+        if (ret == 0 && code_str) {
+            /* Strip shebang line if present (e.g. #!/usr/bin/env node) */
+            const char *src = code_str;
+            size_t src_len = code_len;
+            if (src_len >= 2 && src[0] == '#' && src[1] == '!') {
+                while (src_len > 0 && *src != '\n') { src++; src_len--; }
+                if (src_len > 0) { src++; src_len--; } /* skip the newline */
+            }
+            /* Detect ES module vs plain script (e.g. neobasic.js uses import *) */
+            int is_mod = JS_DetectModule(src, src_len);
+            int pc_flags = (is_mod ? JS_EVAL_TYPE_MODULE : JS_EVAL_TYPE_GLOBAL)
+                           | JS_EVAL_FLAG_COMPILE_ONLY;
+            /* Compile the JS source to bytecode (do not execute). */
+            JSValue obj = JS_Eval(ctx, src, (int)src_len, argv[2], pc_flags);
+            if (JS_IsException(obj)) {
+                js_std_dump_error(ctx);
+                JS_FreeValue(ctx, obj);
+                ret = 1;
+            } else {
+                size_t bc_size;
+                uint8_t *bc = JS_WriteObject(ctx, &bc_size, obj, JS_WRITE_OBJ_BYTECODE);
+                JS_FreeValue(ctx, obj);
+                if (!bc) {
+                    fprintf(stderr, PROG_NAME ": failed to serialize bytecode\n");
+                    ret = 1;
+                } else {
+                    FILE *f = fopen(precompile_output, "wb");
+                    if (!f) {
+                        fprintf(stderr, PROG_NAME ": cannot write '%s': %s\n",
+                                precompile_output, strerror(errno));
+                        ret = 1;
+                    } else {
+                        fwrite(bc, 1, bc_size, f);
+                        fclose(f);
+                        printf("Compiled %s -> %s\n", argv[2], precompile_output);
+                    }
+                    js_free(ctx, bc);
+                }
+            }
+        }
+
+        if (file_buf) js_free(ctx, file_buf);
+        else if (!JS_IsUndefined(g_emitted_code)) JS_FreeCString(ctx, code_str);
+        JS_FreeValue(ctx, g_emitted_code);
+        g_emitted_code = JS_UNDEFINED;
     }
 
     js_std_free_handlers(rt);

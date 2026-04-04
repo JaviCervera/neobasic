@@ -24,9 +24,9 @@ NeoBasic is a structured BASIC-like language (`.nb` files) that transpiles to Ja
 | Variable scoping | Top-level variables are **global** (readable and writable from any function); variables declared inside a function are local to that function |
 | Standard library | A bundled `core` module (auto-imported) provides math, string, and file I/O functions |
 | Testing framework | Vitest |
-| Output | Single `.js` file next to the source (or via `-o` flag) |
+| Output | `.js` or `.qjs` file next to the source (or via `-o` flag); `-p` produces QuickJS bytecode |
 | Runtime target | QuickJS only via the `neobasic` binary; `core.js` uses `globalThis.std` directly (no Node.js or browser paths) |
-| QuickJS support | `npm run bundle:qjs` produces `dist/neobasic.js` — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/`; run as `qjs dist/neobasic.js -c file.nb` |
+| QuickJS support | `npm run bundle:qjs` produces `dist/neobasic.js` (and `dist/neobasic.qjs` bytecode) — a self-contained CLI bundle with Node.js APIs shimmed via `src/shims/` |
 
 ## Architecture
 
@@ -172,8 +172,10 @@ vitest.config.ts
 
 ### Phase 6 — CLI
 - `neobasic -c <file.nb> [-o <out.js>]` — compile to JavaScript file
-- `neobasic -r <file.nb>` — compile in memory and execute immediately (no .js written)
+- `neobasic -p <file.nb> [-o <out.qjs>]` — compile to QuickJS bytecode file
+- `neobasic -r <file.nb>` — compile in memory and execute immediately (no file written)
 - `neobasic -r <file.js>` — run a JavaScript file directly
+- `neobasic -r <file.qjs>` — run a precompiled QuickJS bytecode file
 - Collect all `Include`-d files, resolve and concatenate their ASTs before type-checking
 - Emit clear error messages with file, line, and column
 
@@ -522,7 +524,7 @@ qjs dist/neobasic.js -c myprogram.nb
 
 | File | Purpose |
 |---|---|
-| `interpreter/neobasic.c` | Custom QuickJS entry point; registers `raylib_native`; implements `-c`/`-r`/default CLI modes; `-r .nb` uses `__neobasic_emit` to compile in memory |
+| `interpreter/neobasic.c` | Custom QuickJS entry point; registers `raylib_native`; implements `-c`/`-p`/`-r`/default CLI modes; `-r .nb` and `-p .nb` use `__neobasic_emit` to compile in memory; tries `neobasic.qjs` before `neobasic.js`; default mode tries `program.qjs` before `program.js` |
 | `interpreter/gen_qjs_module.py` | Python generator that reads `raylib_bridge.c` and emits `raylib_qjs_module.c` |
 | `interpreter/raylib_qjs_module.c` | **AUTO-GENERATED** — 276 QJS C wrapper functions for all bridge/color/text-helper functions |
 | `interpreter/emscripten.h` | Minimal stub so `raylib_bridge.c` compiles without the Emscripten toolchain |
@@ -539,6 +541,20 @@ qjs dist/neobasic.js -c myprogram.nb
 - No Emscripten required — the WASM build and neobasic build are independent.
 
 #### Build Steps
+
+Use the top-level script to build everything at once:
+
+```sh
+# Linux / macOS / MSYS2
+bash build_qjs.sh
+
+# Windows
+build_qjs.bat
+```
+
+This builds `dist/neobasic.js` (TypeScript bundle), then `dist/neobasic[.exe]` (C binary), then uses the binary to precompile `dist/neobasic.js` → `dist/neobasic.qjs`. The binary will use `neobasic.qjs` for faster compiler startup on subsequent runs.
+
+To build only the C binary (after `neobasic.js` already exists):
 
 ```sh
 # Windows (from repo root)

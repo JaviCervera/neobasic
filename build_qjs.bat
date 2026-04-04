@@ -3,6 +3,7 @@ REM ================================================================
 REM  build_qjs.bat  --  Build all QuickJS-related artefacts:
 REM
 REM    dist\neobasic.js       NeoBasic compiler CLI (runs under qjs)
+REM    dist\neobasic.qjs      Precompiled bytecode of neobasic.js
 REM    dist\neobasic.exe      Custom QuickJS binary with native Raylib
 REM
 REM  Prerequisites:
@@ -52,7 +53,7 @@ echo     dist\neobasic.js  OK
 
 REM ── Step 2: build neobasic.exe ───────────────────────────────────
 echo.
-echo === [2/2] Building neobasic.exe ===
+echo === [2/3] Building neobasic.exe ===
 
 set BUILD_NBQJS=%SCRIPT_DIR%interpreter\build.bat
 if not exist "%BUILD_NBQJS%" (
@@ -63,10 +64,17 @@ if not exist "%BUILD_NBQJS%" (
 call "%BUILD_NBQJS%"
 if %errorlevel% neq 0 ( echo FAILED: build_nbqjs.bat & exit /b 1 )
 
+REM ── Step 3: precompile neobasic.js → neobasic.qjs ────────────────
+echo.
+echo === [3/3] Precompiling neobasic.js to neobasic.qjs ===
+"%SCRIPT_DIR%dist\neobasic.exe" -p "%SCRIPT_DIR%dist\neobasic.js" -o "%SCRIPT_DIR%dist\neobasic.qjs"
+if %errorlevel% neq 0 ( echo FAILED: precompile neobasic.js & exit /b 1 )
+
 REM ── Done ─────────────────────────────────────────────────────────
 echo.
 echo === Build complete ===
 echo     dist\neobasic.js
+echo     dist\neobasic.qjs
 echo     dist\neobasic.exe
 
 endlocal
