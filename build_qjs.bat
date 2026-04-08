@@ -23,7 +23,7 @@ setlocal EnableDelayedExpansion EnableExtensions
 
 set SCRIPT_DIR=%~dp0
 
-REM ── Helpers ──────────────────────────────────────────────────────
+REM ?? Helpers ??????????????????????????????????????????????????????
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERROR: 'node' not found. Install Node.js from https://nodejs.org/
@@ -35,27 +35,27 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM ── Step 1: build neobasic.js ────────────────────────────────────
+REM ?? Step 1: build neobasic.js ????????????????????????????????????
 echo === [1/4] Building neobasic.js ===
 
 cd /d "%SCRIPT_DIR%"
 
 if not exist "node_modules" (
     echo --^> Installing npm dependencies...
-    npm install
+    call npm install
     if %errorlevel% neq 0 ( echo FAILED: npm install & exit /b 1 )
 )
 
 REM Bundle CLI for QuickJS -> dist/neobasic.js
 REM (esbuild transpiles TypeScript directly; no prior tsc needed)
 echo --^> Bundling for QuickJS...
-npm run bundle:qjs
+call npm run bundle:qjs
 if %errorlevel% neq 0 ( echo FAILED: bundle:qjs & exit /b 1 )
 
 echo.
 echo     dist\neobasic.js  OK
 
-REM ── Step 2: build neobasic.exe ───────────────────────────────────
+REM ?? Step 2: build neobasic.exe ???????????????????????????????????
 echo.
 echo === [2/4] Building neobasic.exe ===
 
@@ -68,13 +68,13 @@ if not exist "%BUILD_NBQJS%" (
 call "%BUILD_NBQJS%"
 if %errorlevel% neq 0 ( echo FAILED: build_nbqjs.bat & exit /b 1 )
 
-REM ── Step 3: precompile neobasic.js → neobasic.qjs ────────────────
+REM ?? Step 3: precompile neobasic.js -> neobasic.qjs ????????????????
 echo.
 echo === [3/4] Precompiling neobasic.js to neobasic.qjs ===
 "%SCRIPT_DIR%dist\neobasic.exe" -p "%SCRIPT_DIR%dist\neobasic.js" -o "%SCRIPT_DIR%dist\neobasic.qjs"
 if %errorlevel% neq 0 ( echo FAILED: precompile neobasic.js & exit /b 1 )
 
-REM ── Step 4: build browser base (requires Emscripten, optional) ───
+REM ?? Step 4: build browser base (requires Emscripten, optional) ???
 echo.
 echo === [4/4] Building browser base (neobasic_browser_base.js) ===
 where emcc >nul 2>&1
@@ -86,7 +86,7 @@ if %errorlevel% equ 0 (
     echo   https://emscripten.org/docs/getting_started/downloads.html
 )
 
-REM ── Done ─────────────────────────────────────────────────────────
+REM ?? Done ?????????????????????????????????????????????????????????
 echo.
 echo === Build complete ===
 echo     dist\neobasic.js
